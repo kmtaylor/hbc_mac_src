@@ -4,11 +4,6 @@
 #include "mem.h"
 
 static XIOModule *mem_io_mod;
-//static uint32_t mem_status;
-
-//static void check_status(void) {
-//    mem_status = XIOModule_DiscreteRead(mem_io_mod, MEM_STATUS_GPIO);
-//}
 
 void mem_init(XIOModule *io_mod) {
     mem_io_mod = io_mod;
@@ -42,13 +37,9 @@ uint8_t mem_get_flags(void) {
 }
 
 void mem_write(uint32_t data) {
-    /* In practice, this should never happen */
-//    do {check_status();} while(MEM_FIFO_FULL(mem_status));
     XIOModule_IoWriteWord(mem_io_mod, MEM_RD_WR_ADDR, data);
 }
 
 uint32_t mem_read(void) {
-    /* In practice, this should never happen */
-//    do {check_status();} while(MEM_FIFO_FULL(mem_status));
     return XIOModule_IoReadWord(mem_io_mod, MEM_RD_WR_ADDR);
 }

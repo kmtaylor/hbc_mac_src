@@ -10,6 +10,7 @@ LDFLAGS += -Wl,-T -Wl,src/lscript.ld -Wl,--gc-sections \
 OBJS += \
 	src/fifo.o \
 	src/mem.o \
+	src/usb.o \
 	src/lcd.o \
 	src/build_tx.o \
 	src/interrupt.o \
