@@ -12,6 +12,8 @@
 char lcd_buf[LCD_ROWS][LCD_COLUMNS];
 
 int main() {
+    uint32_t tmp;
+    int i;
     XIOModule io_mod;
 
     XIOModule_Initialize(&io_mod, XPAR_IOMODULE_0_DEVICE_ID);
@@ -26,8 +28,6 @@ int main() {
     mem_init(&io_mod);
 
     while (1) {
-	int_pause(1);
-	//PRINT_NUM(1, "Val", mem_read());
     }
 
     return 0;
