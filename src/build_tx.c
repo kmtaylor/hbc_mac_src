@@ -9,7 +9,11 @@
 
 static int bit_p = 32;
 static uint32_t cur_buf;
-static tx_rate_t tx_rate;
+
+walsh_t walsh_data[] = {    0xFFFF, 0xAAAA, 0xCCCC, 0x9999,
+			    0xF0F0, 0xA5A5, 0xC3C3, 0x9696,
+			    0xFF00, 0xAA55, 0xCC33, 0x9966,
+			    0xF00F, 0xA55A, 0xC33C, 0x9669 };
 
 static void flush(void) {
     fifo_write(cur_buf);
@@ -34,11 +38,16 @@ static uint8_t crc8_update(uint8_t crc, uint8_t data) {
 static uint8_t crc8(uint32_t header) {
     uint8_t crc = CRC8_INIT;
 
-    crc8_update(crc, (header & 0xff));
-    crc8_update(crc, ((header >> 8) & 0xff));
-    crc8_update(crc, ((header >> 16) & 0xff));
+    crc = crc8_update(crc, (header & 0xff));
+    crc = crc8_update(crc, ((header >> 8) & 0xff));
+    crc = crc8_update(crc, ((header >> 16) & 0xff));
     
     return crc;
+}
+
+#define Z(val) ((seed >> (32 - val)) & 1)
+static uint32_t update_scrambler(uint32_t seed) {
+    return (seed >> 1) | ((Z(11) ^ Z(31) ^ Z(32)) << 31);
 }
 
 static void put_n_bits(uint32_t bits, int num) {
@@ -59,11 +68,47 @@ static void put_n_bits(uint32_t bits, int num) {
     if (bit_p == 0) flush();
 }
 
+static void put_sf_0(tx_rate_t rate) {
+    switch (rate) {
+        case r_sf_64:
+            put_n_bits(BIT_MAP_32_0, 32);
+            put_n_bits(BIT_MAP_32_0, 32);
+            break;
+        case r_sf_32:
+            put_n_bits(BIT_MAP_32_0, 32);
+            break;
+        case r_sf_16:
+            put_n_bits(BIT_MAP_32_0 >> 16, 16);
+            break;
+        case r_sf_8:
+            put_n_bits(BIT_MAP_32_0 >> 24, 8);
+            break;
+    }
+}
+
+static void put_sf_1(tx_rate_t rate) {
+    switch (rate) {
+        case r_sf_64:
+            put_n_bits(BIT_MAP_32_1, 32);
+            put_n_bits(BIT_MAP_32_1, 32);
+            break;
+        case r_sf_32:
+            put_n_bits(BIT_MAP_32_1, 32);
+            break;
+        case r_sf_16:
+            put_n_bits(BIT_MAP_32_1 >> 16, 16);
+            break;
+        case r_sf_8:
+            put_n_bits(BIT_MAP_32_1 >> 24, 8);
+            break;
+    }
+}
+
 static void put_bitmap_32(uint32_t code) {
     int i;
     for (i = 0; i < 32; i++) {
-	if (code & (1 << (31 - i))) PUT_SF8_1;
-	else PUT_SF8_0;
+	if (code & (1 << (31 - i))) put_sf_1(r_sf_8);
+	else put_sf_0(r_sf_8);
     }
 }
 
@@ -72,54 +117,83 @@ void build_tx_preamble(void) {
     put_bitmap_32(PREAMBLE_2);
 }
 
-void build_tx_sfd(void) {
-    put_bitmap_32(SFD_1);
-    put_bitmap_32(SFD_2);
-}
+void build_tx_sfd(plcp_header_t *header_info) {
+    if (!header_info->use_ri) {
+	put_bitmap_32(SFD_1);
+	put_bitmap_32(SFD_2);
+	return;
+    }
 
-void build_tx_ri(void) {
-    switch (tx_rate) {
+    switch (header_info->data_rate) {
+	case r_sf_64:
+	    put_bitmap_32(SFD_1);
+	    put_bitmap_32(SFD_2);
+	    /* 12 * sf_8 Chips  = 3 * sf_32 */
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_32);
+	    break;
+	case r_sf_32:
+	    put_sf_0(r_sf_16);
+	    put_bitmap_32(SFD_1);
+	    put_bitmap_32(SFD_2);
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_16);
+	    break;
+	case r_sf_16:
+	    put_sf_0(r_sf_32);
+	    put_bitmap_32(SFD_1);
+	    put_bitmap_32(SFD_2);
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_32);
+	    break;
 	case r_sf_8:
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_16);
 	    put_bitmap_32(SFD_1);
 	    put_bitmap_32(SFD_2);
-	    put_n_bits(0, 12);
-	    break;
-	case r_sf_4:
-	    put_n_bits(0, 2);
-	    put_bitmap_32(SFD_1);
-	    put_bitmap_32(SFD_2);
-	    put_n_bits(0, 10);
-	    break;
-	case r_sf_2:
-	    put_n_bits(0, 4);
-	    put_bitmap_32(SFD_1);
-	    put_bitmap_32(SFD_2);
-	    put_n_bits(0, 8);
-	    break;
-	case r_sf_1:
-	    put_n_bits(0, 6);
-	    put_bitmap_32(SFD_1);
-	    put_bitmap_32(SFD_2);
-	    put_n_bits(0, 6);
+	    put_sf_0(r_sf_32);
+	    put_sf_0(r_sf_16);
 	    break;
     }
 }
 
+static void modulate(uint32_t data, tx_rate_t rate) {
+    /* Bit order isn't clear - send LSB first CHECK THIS */
+    int i, j;
+    walsh_t walsh_code;
+
+    /* Symbol size is 4 bits */
+    for (i = 0; i < 32; i += SYM_SIZE) {
+	walsh_code = walsh_data[(data >> i) & SYM_MASK];
+	for (j = 0; j < WALSH_SIZE; j++) {
+	    if (walsh_code & (1 << j)) put_sf_1(rate);
+	    else put_sf_0(rate);
+	}
+    }
+}
+
 /* Table 82 */
-void build_tx_plcp_header_drf(plcp_header_t *header_info) {
-    uint32_t header_bits;
+void build_tx_plcp_header(plcp_header_t *header_info) {
+    uint32_t header_bits = 0;
 
-    header_bits = header_info->data_rate;
-    header_bits |= header_info->pilot_info << 3;
-    header_bits |= header_info->burst_mode << 8;
-    header_bits |= header_info->scrambler_seed << 11;
-    header_bits |= header_info->PDSU_length << 16;
-    header_bits |= crc8(header_bits) << 24;
+    header_bits |= header_info->data_rate	<< HDR_DR_SHIFT;
+    header_bits |= header_info->pilot_info	<< HDR_PI_SHIFT;
+    header_bits |= header_info->burst_mode	<< HDR_BM_SHIFT;
+    header_bits |= header_info->scrambler_seed	<< HDR_SS_SHIFT;
+    header_bits |= header_info->PDSU_length	<< HDR_LEN_SHIFT;
+    header_info->crc8 = crc8(header_bits);
+    header_bits |= header_info->crc8		<< HDR_CRC_SHIFT;
+
+    build_tx_preamble();
+    build_tx_sfd(header_info);
+
+    if (header_info->use_ri) modulate(header_bits, header_info->data_rate);
+    else modulate(header_bits, r_sf_64);
 }
 
-void build_tx_plcp_header_ri(plcp_header_t *header_info) {
-}
-
+/* Implement this as a separate FIFO for efficiency */
 void build_tx_payload(void) {}
 
 void tx_trigger(void) {
