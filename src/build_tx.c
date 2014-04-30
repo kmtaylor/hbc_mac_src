@@ -3,6 +3,8 @@
 #ifndef DEBUG
 #include <xiomodule.h>
 #include "fifo.h"
+#include "scrambler.h"
+#include "mem.h"
 #endif
 
 #include "build_tx.h"
@@ -43,11 +45,6 @@ static uint8_t crc8(uint32_t header) {
     crc = crc8_update(crc, ((header >> 16) & 0xff));
     
     return crc;
-}
-
-#define Z(val) ((seed >> (32 - val)) & 1)
-static uint32_t update_scrambler(uint32_t seed) {
-    return (seed >> 1) | ((Z(11) ^ Z(31) ^ Z(32)) << 31);
 }
 
 static void put_n_bits(uint32_t bits, int num) {
@@ -193,8 +190,19 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
     else modulate(header_bits, r_sf_64);
 }
 
-/* Implement this as a separate FIFO for efficiency */
-void build_tx_payload(void) {}
+void build_tx_payload(plcp_header_t *header_info) {
+    uint32_t data; /* FIXME: Input data source?? */
+    uint8_t num_words = header_info->PDSU_length / 4;
+    if (header_info->PDSU_length % 4) num_words++;
+
+    scrambler_reseed(header_info->scrambler_seed);
+    while (num_words) {
+	data = mem_read();
+	data ^= scrambler_read();
+	modulate(data, header_info->data_rate);
+	num_words--;
+    }
+}
 
 void tx_trigger(void) {
     flush();

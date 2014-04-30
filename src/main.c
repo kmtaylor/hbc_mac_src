@@ -7,6 +7,7 @@
 #include "usb.h"
 #include "mem.h"
 #include "build_tx.h"
+#include "scrambler.h"
 #include "interrupt.h"
 
 char lcd_buf[LCD_ROWS][LCD_COLUMNS];
@@ -26,8 +27,14 @@ int main() {
     usb_init(&io_mod);
     lcd_init(&io_mod);
     mem_init(&io_mod);
+    scrambler_init(&io_mod);
+
+    scrambler_reseed(1);
 
     while (1) {
+	tmp = scrambler_read();
+	PRINT_NUM(1, "SRM_VAL:", tmp);
+	int_pause(1);
     }
 
     return 0;
