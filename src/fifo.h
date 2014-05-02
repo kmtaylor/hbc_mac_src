@@ -17,3 +17,4 @@ extern void fifo_write(uint32_t data);
 extern uint32_t fifo_read(void);
 
 extern void fifo_trigger(void);
+extern void fifo_reset(void);

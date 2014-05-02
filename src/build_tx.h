@@ -51,4 +51,3 @@ typedef uint16_t walsh_t;
 
 extern void build_tx_plcp_header(plcp_header_t *header_info);
 extern void build_tx_payload(plcp_header_t *header_info);
-extern void tx_trigger(void);

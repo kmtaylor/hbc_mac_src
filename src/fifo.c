@@ -2,29 +2,43 @@
 #include <xiomodule.h>
 
 #include "fifo.h"
+#include "interrupt.h"
+#include "lcd.h"
 
 static XIOModule *fifo_io_mod;
-static uint32_t fifo_status;
+static int triggered;
 
-static void check_status(void) {
-    fifo_status = XIOModule_DiscreteRead(fifo_io_mod, FIFO_STATUS_GPIO);
+static inline uint32_t check_status(void) {
+    return XIOModule_DiscreteRead(fifo_io_mod, FIFO_STATUS_GPIO);
 }
+
+void fifo_trigger(void) {
+    if (triggered) return;
+    XIOModule_DiscreteSet(fifo_io_mod, FIFO_TRIGGER_GPIO, FIFO_TRIGGER);
+    XIOModule_DiscreteClear(fifo_io_mod, FIFO_TRIGGER_GPIO, FIFO_TRIGGER);
+    triggered = 1;
+}
+
+void fifo_reset(void) {
+    triggered = 0;
+}
+
+static int_handler_t fifo_int_handler = {
+    .irq_line = IRQ_FIFO_ALMOST_FULL,
+    .func = fifo_trigger,
+};
 
 void fifo_init(XIOModule *io_mod) {
     fifo_io_mod = io_mod;
+    add_int_handler(&fifo_int_handler);
 }
 
 void fifo_write(uint32_t data) {
-    check_status();
-    if (!FIFO_FULL(fifo_status))
-        XIOModule_IoWriteWord(fifo_io_mod, FIFO_ADDR, data);
+    /* Block until write is available */
+    while (FIFO_FULL(check_status()));
+    XIOModule_IoWriteWord(fifo_io_mod, FIFO_ADDR, data);
 }
 
 uint32_t fifo_read(void) {
     return XIOModule_IoReadWord(fifo_io_mod, FIFO_ADDR);
-}
-
-void fifo_trigger(void) {
-    XIOModule_DiscreteSet(fifo_io_mod, FIFO_TRIGGER_GPIO, FIFO_TRIGGER);
-    XIOModule_DiscreteClear(fifo_io_mod, FIFO_TRIGGER_GPIO, FIFO_TRIGGER);
 }

@@ -1,10 +1,21 @@
 #include <stdint.h>
+#include <string.h>
 
 #ifndef DEBUG
 #include <xiomodule.h>
 #include "fifo.h"
 #include "scrambler.h"
 #include "mem.h"
+#include "lcd.h"
+#include "interrupt.h"
+extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
+#else
+extern void fifo_write(uint32_t data);
+extern uint32_t scrambler_read(void);
+extern void scrambler_reseed(int seed);
+extern uint32_t mem_read(void);
+extern void fifo_trigger(void);
+extern int writing;
 #endif
 
 #include "build_tx.h"
@@ -12,12 +23,14 @@
 static int bit_p = 32;
 static uint32_t cur_buf;
 
-walsh_t walsh_data[] = {    0xFFFF, 0xAAAA, 0xCCCC, 0x9999,
-			    0xF0F0, 0xA5A5, 0xC3C3, 0x9696,
-			    0xFF00, 0xAA55, 0xCC33, 0x9966,
-			    0xF00F, 0xA55A, 0xC33C, 0x9669 };
+walsh_t walsh_data[] = {    0x9669, 0xC33C, 0xA55A, 0xF00F, 
+			    0x9966, 0xCC33, 0xAA55, 0xFF00, 
+			    0x9696, 0xC3C3, 0xA5A5, 0xF0F0, 
+			    0x9999, 0xCCCC, 0xAAAA, 0xFFFF };
 
 static void flush(void) {
+    static int i;
+    //PRINT_NUM(1, "flush", ++i);
     fifo_write(cur_buf);
     cur_buf = 0;
     bit_p = 32;
@@ -175,6 +188,8 @@ static void modulate(uint32_t data, tx_rate_t rate) {
 void build_tx_plcp_header(plcp_header_t *header_info) {
     uint32_t header_bits = 0;
 
+    fifo_reset();
+
     header_bits |= header_info->data_rate	<< HDR_DR_SHIFT;
     header_bits |= header_info->pilot_info	<< HDR_PI_SHIFT;
     header_bits |= header_info->burst_mode	<< HDR_BM_SHIFT;
@@ -191,9 +206,11 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
 }
 
 void build_tx_payload(plcp_header_t *header_info) {
-    uint32_t data; /* FIXME: Input data source?? */
+    uint32_t data;
     uint8_t num_words = header_info->PDSU_length / 4;
     if (header_info->PDSU_length % 4) num_words++;
+
+    writing = 1;
 
     scrambler_reseed(header_info->scrambler_seed);
     while (num_words) {
@@ -202,9 +219,9 @@ void build_tx_payload(plcp_header_t *header_info) {
 	modulate(data, header_info->data_rate);
 	num_words--;
     }
-}
 
-void tx_trigger(void) {
+    writing = 0;
+
     flush();
     fifo_trigger();
 }

@@ -12,10 +12,18 @@ static volatile int do_pause;
 
 static int_handler_t *int_handler_list = NULL;
 
+int writing;
+
 #if int_dbg_sleep
 static void sleep(void) {
     volatile int counter = 10E6;
     while (counter) counter--;
+}
+#endif
+
+#if int_dbg_freeze
+static void freeze(void) {
+    while (1);
 }
 #endif
 
@@ -27,35 +35,42 @@ void _int_pause(int init_pause) {
 
 void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
     /* Debug IRQ */
+#if int_dbg_led
     uint32_t dbg_led;
     dbg_led = XIOModule_DiscreteRead(io_mod, 1);
-    dbg_led >>= 8;
+    //dbg_led >>= 8;
     XIOModule_DiscreteWrite(io_mod, 2, dbg_led); 
+#endif
 
     lcd_clrln(0);
 
     switch (irq_line) {
 	case IRQ_BUTTON :
-	    PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
+	    //PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
 	    do_pause = 0;
 	    break;
 	case IRQ_FIFO_FULL : 
-	    lcd_printf(0, "FIFO full");
+	    //lcd_printf(0, "FIFO full");
 	    break;
 	case IRQ_FIFO_ALMOST_FULL :
-	    lcd_printf(0, "FIFO almost full");
+	    //lcd_printf(0, "FIFO almost full");
 	    break;
 	case IRQ_FIFO_OVERFLOW :
-	    lcd_printf(0, "FIFO overflow");
+	    //lcd_printf(0, "FIFO overflow");
 	    break;
 	case IRQ_FIFO_EMPTY :
-	    lcd_printf(0, "FIFO empty");
+	    if (writing) {
+		lcd_printf(0, "FIFO empty (bad)");
+		freeze();
+	    } else {
+		lcd_printf(0, "FIFO empty");
+	    }
 	    break;
 	case IRQ_FIFO_ALMOST_EMPTY :
-	    lcd_printf(0, "FIFO almost emty");
+	    //lcd_printf(0, "FIFO almost emty");
 	    break;
 	case IRQ_FIFO_UNDERFLOW :
-	    lcd_printf(0, "FIFO underflow");
+	    //lcd_printf(0, "FIFO underflow");
 	    break;
 	case IRQ_CLOCK_LOSS :
 	    lcd_printf(0, "Lost clock lock");
@@ -126,6 +141,7 @@ void enable_interrupts(void) {
 
 void add_int_handler(int_handler_t *new_handler) {
     int_handler_t *last_handler = int_handler_list;
+    new_handler->next = NULL;
 
     if (!last_handler) {
 	int_handler_list = new_handler;

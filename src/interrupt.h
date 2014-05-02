@@ -32,8 +32,12 @@ struct s_int_handler {
 
 extern void add_int_handler(int_handler_t *new_handler);
 
+extern int writing;
+
 #define int_dbg 1
 #define int_dbg_sleep 0
+#define int_dbg_led 1
+#define int_dbg_freeze 1
 
 #if int_dbg
 #define int_pause(init_pause) _int_pause(init_pause)
