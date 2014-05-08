@@ -11,8 +11,7 @@ extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
 static volatile int do_pause;
 
 static int_handler_t *int_handler_list = NULL;
-
-int writing;
+static XIOModule *int_io_mod;
 
 #if int_dbg_sleep
 static void sleep(void) {
@@ -22,7 +21,7 @@ static void sleep(void) {
 #endif
 
 #if int_dbg_freeze
-static void freeze(void) {
+void _int_freeze(void) {
     while (1);
 }
 #endif
@@ -46,34 +45,15 @@ void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
 
     switch (irq_line) {
 	case IRQ_BUTTON :
-	    //PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
+	    PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
 	    do_pause = 0;
 	    break;
 	case IRQ_FIFO_FULL : 
-	    //lcd_printf(0, "FIFO full");
-	    break;
-	case IRQ_FIFO_ALMOST_FULL :
-	    //lcd_printf(0, "FIFO almost full");
-	    break;
-	case IRQ_FIFO_OVERFLOW :
-	    //lcd_printf(0, "FIFO overflow");
-	    break;
-	case IRQ_FIFO_EMPTY :
-	    if (writing) {
-		lcd_printf(0, "FIFO empty (bad)");
-		freeze();
-	    } else {
-		lcd_printf(0, "FIFO empty");
-	    }
-	    break;
-	case IRQ_FIFO_ALMOST_EMPTY :
-	    //lcd_printf(0, "FIFO almost emty");
-	    break;
-	case IRQ_FIFO_UNDERFLOW :
-	    //lcd_printf(0, "FIFO underflow");
+	    lcd_printf(0, "FIFO full");
 	    break;
 	case IRQ_CLOCK_LOSS :
 	    lcd_printf(0, "Lost clock lock");
+	    int_freeze();
 	    break;
 	case IRQ_RAM_INIT :
 	    lcd_printf(0, "RAM not ready");
@@ -94,7 +74,7 @@ void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
 	    lcd_printf(0, "USB Empty");
 	    break;
 	default :
-	    lcd_printf(0, "Bad Interrupt!");
+	    break;
     }
 #if int_dbg_sleep
     sleep();
@@ -119,24 +99,35 @@ static void int_handler(void *io_mod_p) {
     /* Acknowledge this interrupt */
     XIOModule_AckIntr(io_mod->BaseAddress, (1 << (irq_line + 16)));
 
+#if int_dbg
+    print_interrupt_info(io_mod, irq_line);
+#endif
+
     /* Chain other interrupt handlers */
     while (int_handler) {
 	if (int_handler->irq_line == irq_line) int_handler->func();
 	int_handler = int_handler->next;
     }
-
-#if int_dbg
-    print_interrupt_info(io_mod, irq_line);
-#endif
 }
 
 void setup_interrupts(XIOModule *io_mod) {
+    int_io_mod = io_mod;
     microblaze_register_handler(int_handler, io_mod);
-    XIOModule_EnableIntr(io_mod->BaseAddress, 0x3fff0000);
+}
+
+void enable_disable_interrupt(irq_line_t int_no, int enable) {
+    static uint32_t interrupt_mask;
+    if (enable) interrupt_mask |= (1 << (int_no + 16));
+    else interrupt_mask &= ~(1 << (int_no + 16));
+    XIOModule_EnableIntr(int_io_mod->BaseAddress, interrupt_mask);
 }
 
 void enable_interrupts(void) {
     microblaze_enable_interrupts();
+}
+
+void disable_interrupts(void) {
+    microblaze_disable_interrupts();
 }
 
 void add_int_handler(int_handler_t *new_handler) {

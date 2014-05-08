@@ -27,6 +27,7 @@ int main() {
     scrambler_init(&io_mod);
 
     setup_interrupts(&io_mod);
+    ADD_INTERRUPT(IRQ_BUTTON);
     enable_interrupts();
     
     plcp_header_t header_info = {
@@ -43,8 +44,10 @@ int main() {
     i = 0;
 
     while (1) {
+	//int_pause(1);
+	//lcd_clear();
+
 	switch_val = XIOModule_DiscreteRead(&io_mod, 2);
-//	XIOModule_DiscreteWrite(&io_mod, 2, switch_val);
 
 	if (switch_val & (1 << 7)) header_info.use_ri = 1;
 	else header_info.use_ri = 0;
@@ -53,12 +56,10 @@ int main() {
 
 	mem_set_rd_p(0);
 
-	int_pause(1);
-	lcd_clear();
-
-	PRINT_NUM(1, "PACK:", ++i);
 	build_tx_plcp_header(&header_info);
 	build_tx_payload(&header_info);
+
+	PRINT_NUM(1, "PACK:", ++i);
     }
 
     return 0;

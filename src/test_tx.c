@@ -15,6 +15,9 @@ void fifo_write(uint32_t data) {
 void fifo_trigger(void) {
 }
 
+void fifo_reset(void) {
+}
+
 uint32_t scrambler_read(void) {
     return 0x69540152;
 }
@@ -27,6 +30,7 @@ void scrambler_reseed(int seed) {
 }
 
 int main (void) {
+#if 0
     plcp_header_t header_info = {
 	.data_rate = r_sf_64,
 	.pilot_info = pilot_none,
@@ -38,6 +42,9 @@ int main (void) {
 
     build_tx_plcp_header(&header_info);
     build_tx_payload(&header_info);
+#endif
+
+    put_n_bits(0x12345678, 32);
     printf("FIFO used: %i\n", fifo_used);
     return 0;
 }
