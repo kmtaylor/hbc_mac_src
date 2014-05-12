@@ -16,6 +16,8 @@ extern void scrambler_reseed(int seed);
 extern uint32_t mem_read(void);
 extern void fifo_trigger(void);
 extern void fifo_reset(void);
+extern void fifo_modulate_sf(uint8_t sf);
+extern void fifo_write_size(uint8_t size);
 #endif
 
 #include "build_tx.h"

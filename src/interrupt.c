@@ -12,6 +12,7 @@ static volatile int do_pause;
 
 static int_handler_t *int_handler_list = NULL;
 static XIOModule *int_io_mod;
+static uint32_t interrupt_mask;
 
 #if int_dbg_sleep
 static void sleep(void) {
@@ -116,7 +117,6 @@ void setup_interrupts(XIOModule *io_mod) {
 }
 
 void enable_disable_interrupt(irq_line_t int_no, int enable) {
-    static uint32_t interrupt_mask;
     if (enable) interrupt_mask |= (1 << (int_no + 16));
     else interrupt_mask &= ~(1 << (int_no + 16));
     XIOModule_EnableIntr(int_io_mod->BaseAddress, interrupt_mask);

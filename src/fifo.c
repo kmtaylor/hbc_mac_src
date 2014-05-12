@@ -33,12 +33,11 @@ void fifo_write_size(uint8_t size) {
     XIOModule_IoWriteByte(fifo_io_mod, FIFO_MASK_ADDR, size);
 }
 
+#if 0
 static void fifo_irq_empty(void) {
     if (fifo_writing) {
 	lcd_printf(0, "FIFO empty (bad)");
         int_freeze();
-    } else {
-        lcd_printf(0, "FIFO empty");
     }
 }
 
@@ -49,11 +48,12 @@ static void fifo_irq_overflow(void) {
 
 DECLARE_HANDLER(IRQ_FIFO_EMPTY, fifo_irq_empty);
 DECLARE_HANDLER(IRQ_FIFO_OVERFLOW, fifo_irq_overflow);
+#endif
 
 void fifo_init(XIOModule *io_mod) {
     fifo_io_mod = io_mod;
-    ADD_INTERRUPT_HANDLER(IRQ_FIFO_EMPTY);
-    ADD_INTERRUPT_HANDLER(IRQ_FIFO_OVERFLOW);
+//    ADD_INTERRUPT_HANDLER(IRQ_FIFO_EMPTY);
+//    ADD_INTERRUPT_HANDLER(IRQ_FIFO_OVERFLOW);
 }
 
 void fifo_write(uint32_t data) {

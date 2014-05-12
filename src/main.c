@@ -44,8 +44,7 @@ int main() {
     i = 0;
 
     while (1) {
-	//int_pause(1);
-	//lcd_clear();
+	int_pause(1);
 
 	switch_val = XIOModule_DiscreteRead(&io_mod, 2);
 
@@ -56,8 +55,10 @@ int main() {
 
 	mem_set_rd_p(0);
 
+	disable_interrupts();
 	build_tx_plcp_header(&header_info);
 	build_tx_payload(&header_info);
+	enable_interrupts();
 
 	PRINT_NUM(1, "PACK:", ++i);
     }
