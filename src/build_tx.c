@@ -152,6 +152,9 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
     header_bits |= header_info->crc8		<< HDR_CRC_SHIFT;
 
     build_tx_preamble();
+    build_tx_preamble();
+    build_tx_preamble();
+    build_tx_preamble();
     build_tx_sfd(header_info);
 
     if (header_info->use_ri) {
