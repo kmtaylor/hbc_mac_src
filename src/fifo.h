@@ -1,9 +1,5 @@
-#define FIFO_ADDR 0x00
-#define FIFO_MASK_ADDR 0x01
 #define FIFO_STATUS_GPIO 1
 #define FIFO_TRIGGER_GPIO 1
-#define MODULATOR_ADDR 0x18
-#define MODULATOR_SF_ADDR 0x19
 
 #define FIFO_TRIGGER		    (1 << 0)
 #define FIFO_FLUSH		    (1 << 5)

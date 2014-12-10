@@ -1,6 +1,3 @@
-#define LCD_DATA_ADDR 0x03
-#define LCD_CMD_ADDR  0x02
-
 #define LCD_ROWS 2
 #define LCD_COLUMNS 16
 

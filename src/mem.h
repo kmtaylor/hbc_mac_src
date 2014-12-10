@@ -1,8 +1,3 @@
-#define MEM_RD_WR_ADDR 0x04
-#define MEM_FLAGS_ADDR 0x05
-#define MEM_RD_P_ADDR  0x08
-#define MEM_WR_P_ADDR  0x0C
-
 #define MEM_READ_DOWN  0x02
 #define MEM_WRITE_DOWN 0x01
 

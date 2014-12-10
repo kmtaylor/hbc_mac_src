@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <xiomodule.h>
+#include <preprocessor/constants.vhh>
 
 #include "fifo.h"
 #include "interrupt.h"
@@ -30,7 +31,7 @@ void fifo_reset(void) {
 }
 
 void fifo_write_size(uint8_t size) {
-    XIOModule_IoWriteByte(fifo_io_mod, FIFO_MASK_ADDR, size);
+    XIOModule_IoWriteByte(fifo_io_mod, HEX(FIFO_MASK_ADDR), size);
 }
 
 #if 0
@@ -59,19 +60,19 @@ void fifo_init(XIOModule *io_mod) {
 void fifo_write(uint32_t data) {
     /* Block until write is available */
     while (FIFO_FULL(check_status()));
-    XIOModule_IoWriteWord(fifo_io_mod, FIFO_ADDR, data);
+    XIOModule_IoWriteWord(fifo_io_mod, HEX(FIFO_ADDR), data);
 }
 
 void fifo_modulate(uint32_t data) {
     /* Block until write is available */
     while (FIFO_ALMOST_FULL(check_status())) fifo_trigger();
-    XIOModule_IoWriteWord(fifo_io_mod, MODULATOR_ADDR, data);
+    XIOModule_IoWriteWord(fifo_io_mod, HEX(MODULATOR_ADDR), data);
 }
 
 void fifo_modulate_sf(uint8_t data) {
-    XIOModule_IoWriteByte(fifo_io_mod, MODULATOR_SF_ADDR, data);
+    XIOModule_IoWriteByte(fifo_io_mod, HEX(MODULATOR_SF_ADDR), data);
 }
 
 uint32_t fifo_read(void) {
-    return XIOModule_IoReadWord(fifo_io_mod, FIFO_ADDR);
+    return XIOModule_IoReadWord(fifo_io_mod, HEX(RX_FIFO_ADDR));
 }

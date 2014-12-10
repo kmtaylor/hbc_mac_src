@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <xiomodule.h>
+#include <preprocessor/constants.vhh>
 
 #include "interrupt.h"
 #include "lcd.h"
@@ -45,34 +46,41 @@ void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
     lcd_clrln(0);
 
     switch (irq_line) {
-	case IRQ_BUTTON :
+	case INT(IRQ_BUTTON):
 	    PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
+	    //PRINT_NUM(1, "Data:", fifo_read());
 	    do_pause = 0;
 	    break;
-	case IRQ_FIFO_FULL : 
+	case INT(IRQ_FIFO_FULL): 
 	    lcd_printf(0, "FIFO full");
 	    break;
-	case IRQ_CLOCK_LOSS :
+	case INT(IRQ_CLOCK_LOSS):
 	    lcd_printf(0, "Lost clock lock");
 	    int_freeze();
 	    break;
-	case IRQ_RAM_INIT :
+	case INT(IRQ_RAM_INIT):
 	    lcd_printf(0, "RAM not ready");
 	    break;
-	case IRQ_RAM_FIFO_FULL :
+	case INT(IRQ_RAM_FIFO_FULL):
 	    lcd_printf(0, "RAM FIFO full");
 	    break;
-	case IRQ_USB_INT :
+	case INT(IRQ_USB_INT):
 	    lcd_printf(0, "USB IRQ");
 	    break;
-	case IRQ_USB_FULL :
+	case INT(IRQ_USB_FULL):
 	    lcd_printf(0, "USB Full");
 	    break;
-	case IRQ_USB_EN :
+	case INT(IRQ_USB_EN):
 	    lcd_printf(0, "USB Enabled");
 	    break;
-	case IRQ_USB_EMPTY :
+	case INT(IRQ_USB_EMPTY):
 	    lcd_printf(0, "USB Empty");
+	    break;
+	case INT(IRQ_RX_DATA_READY):
+	    //PRINT_NUM(1, "Data:", fifo_read());
+	    break;
+	case INT(IRQ_BUTTON_2):
+	    PRINT_NUM(1, "Data2:", fifo_read());
 	    break;
 	default :
 	    break;

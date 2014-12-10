@@ -2,10 +2,12 @@
 MCS_INSTANCE_NAME := mcs_0
 BSP_LOCATION := ../standalone_bsp_0
 HARDWARE_DESC_LOCATION := ../Genesys_64k/system.xml
+HDL_LOCATION := $(HOME)/Xilinx/Projects/transceiver
 
 PROJECT_NAME := tx_framer
 
 INCLUDE := -I$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/include
+INCLUDE += -I$(HDL_LOCATION)
 
 CFLAGS += -mno-xl-reorder -mlittle-endian -mcpu=v8.40.a -mxl-soft-mul \
 	  -ffunction-sections -fdata-sections
