@@ -1,8 +1,8 @@
 #define PREAMBLE_1	0xC4CA5018
 #define PREAMBLE_2	0xFAE4B982
 
-#define SFD_1		0x565ddbca
-#define SFD_2		0x58267acd
+#define SFD_1		0x565DDBCA
+#define SFD_2		0x58267ACD
 
 #define HDR_DR_SHIFT	0
 #define HDR_PI_SHIFT	3

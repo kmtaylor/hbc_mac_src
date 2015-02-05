@@ -28,8 +28,8 @@ int main() {
     scrambler_init(&io_mod);
 
     setup_interrupts(&io_mod);
-//    ADD_INTERRUPT(INT(IRQ_BUTTON));
-    //ADD_INTERRUPT(INT(IRQ_RX_DATA_READY));
+    ADD_INTERRUPT(INT(IRQ_BUTTON));
+    ADD_INTERRUPT(INT(IRQ_RX_DATA_READY));
     ADD_INTERRUPT(INT(IRQ_BUTTON_2));
     enable_interrupts();
     
@@ -37,17 +37,15 @@ int main() {
         .pilot_info = pilot_none,
         .burst_mode = 0,
         .scrambler_seed = 0,
-        .PDSU_length = 4
+        .PDSU_length = 32
     };
 
     for (i = 0; i < 64; i++) {
-	mem_write(0x12345678);
+	mem_write(i);
     }
 
-    i = 0;
-
-//    while (1) {
-//	int_pause(1);
+    while (1) {
+	int_pause(1);
 
 	switch_val = XIOModule_DiscreteRead(&io_mod, 2);
 
@@ -70,17 +68,11 @@ int main() {
 	    if (header_info.data_rate == 3) lcd_printf(0, "Rate: 08CPB, SFD");
 	}
 
-	//fifo_reset();
-	//fifo_write_size(32);
-	//fifo_write(0x87654321);
 	disable_interrupts();
 	build_tx_plcp_header(&header_info);
 	build_tx_payload(&header_info);
 	enable_interrupts();
-
-	//PRINT_NUM(1, "PACK:", ++i);
-//    }
-    while(1) {}
+    }
 
     return 0;
 }
