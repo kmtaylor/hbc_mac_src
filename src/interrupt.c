@@ -48,7 +48,6 @@ void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
     switch (irq_line) {
 	case INT(IRQ_BUTTON_2):
 	    PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
-	    //PRINT_NUM(1, "Data:", fifo_read());
 	    do_pause = 0;
 	    break;
 	case INT(IRQ_FIFO_FULL): 
@@ -76,11 +75,8 @@ void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
 	case INT(IRQ_USB_EMPTY):
 	    lcd_printf(0, "USB Empty");
 	    break;
-	case INT(IRQ_RX_DATA_READY):
-	    PRINT_NUM(1, "Data:", fifo_read());
-	    break;
 	case INT(IRQ_BUTTON):
-	    PRINT_NUM(1, "Data2:", fifo_read());
+	    PRINT_NUM(1, "FIFO_RD:", fifo_read());
 	    break;
 	default :
 	    break;

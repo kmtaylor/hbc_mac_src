@@ -10,6 +10,7 @@
 #include "build_tx.h"
 #include "scrambler.h"
 #include "interrupt.h"
+#include "extract_rx.h"
 
 char lcd_buf[LCD_ROWS][LCD_COLUMNS];
 
@@ -26,6 +27,7 @@ int main() {
     usb_init(&io_mod);
     mem_init(&io_mod);
     scrambler_init(&io_mod);
+    rx_init(&io_mod);
 
     setup_interrupts(&io_mod);
     ADD_INTERRUPT(INT(IRQ_BUTTON));

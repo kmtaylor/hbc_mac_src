@@ -23,6 +23,7 @@ OBJS += \
 	src/build_tx.o \
 	src/interrupt.o \
 	src/scrambler.o \
+	src/extract_rx.o \
 	src/main.o
 
 # Add inputs and outputs from these tool invocations to the build variables 
