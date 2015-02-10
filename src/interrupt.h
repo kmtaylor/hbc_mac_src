@@ -20,9 +20,7 @@ struct s_int_handler {
 
 extern void add_int_handler(int_handler_t *new_handler);
 
-#define ADD_INTERRUPT_HANDLER(int_no) { \
-	add_int_handler(&__##int_no##_struct);				    \
-	enable_disable_interrupt(int_no, 1);}
+#define ADD_INTERRUPT_HANDLER(int_no) add_int_handler(&__##int_no##_struct)
 
 #define ADD_INTERRUPT(int_no) enable_disable_interrupt(int_no, 1)
 

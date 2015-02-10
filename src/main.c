@@ -31,7 +31,8 @@ int main() {
 
     setup_interrupts(&io_mod);
     ADD_INTERRUPT(INT(IRQ_BUTTON));
-    ADD_INTERRUPT(INT(IRQ_RX_DATA_READY));
+    ADD_INTERRUPT(INT(IRQ_RX_FIFO_FULL));
+    ADD_INTERRUPT(INT(IRQ_RX_PKT_READY));
     ADD_INTERRUPT(INT(IRQ_BUTTON_2));
     enable_interrupts();
     
