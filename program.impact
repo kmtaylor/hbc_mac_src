@@ -1,7 +1,0 @@
-setmode -bs
-setcable -p auto
-identify
-attachflash -position 1 -bpi "28F256P30"
-assignfiletoattachedflash -position 1 -file "/home/kmtaylor/src/transceiver/tx_framer/PROM.mcs"
-Program -p 1 -dataWidth 16 -rs1 NONE -rs0 NONE -bpionly -e -v -loadfpga
-quit

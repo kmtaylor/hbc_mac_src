@@ -3,6 +3,9 @@ MCS_INSTANCE_NAME := mcs_0
 BSP_LOCATION := ../standalone_bsp_0
 HARDWARE_DESC_LOCATION := ../Genesys_64k/system.xml
 HDL_LOCATION := $(HOME)/Xilinx/Projects/transceiver
+HDL_BUILD_LOCATION := $(HOME)/Xilinx/Projects/transceiver_spartan
+DEVICE := xc6slx9tqg144-2
+BITSTREAM := toplevel.bit
 
 PROJECT_NAME := tx_framer
 
@@ -19,6 +22,7 @@ OBJS += \
 	src/fifo.o \
 	src/mem.o \
 	src/usb.o \
+	src/spi.o \
 	src/lcd.o \
 	src/build_tx.o \
 	src/interrupt.o \
@@ -32,7 +36,7 @@ ELFSIZE += $(PROJECT_NAME).elf.size
 ELFCHECK += $(PROJECT_NAME).elf.elfcheck
 
 # All Target
-all: $(PROJECT_NAME).elf secondary-outputs
+all: $(PROJECT_NAME).bit secondary-outputs
 
 # Tool invocations
 $(PROJECT_NAME).elf: $(OBJS) src/lscript.ld $(USER_OBJS)
@@ -54,6 +58,13 @@ $(PROJECT_NAME).elf.elfcheck: $(PROJECT_NAME).elf
 		-pe $(MCS_INSTANCE_NAME) | tee "$(PROJECT_NAME).elf.elfcheck"
 	@echo 'Finished building: $@'
 	@echo ' '
+
+$(PROJECT_NAME).bit: $(PROJECT_NAME).elf $(HDL_BUILD_LOCATION)/$(BITSTREAM)
+	data2mem -p $(DEVICE) \
+	    -bm $(HDL_BUILD_LOCATION)/ipcore_dir/$(MCS_INSTANCE_NAME)_bd.bmm \
+	    -bd $< tag $(MCS_INSTANCE_NAME) \
+	    -bt $(HDL_BUILD_LOCATION)/$(BITSTREAM) \
+	    -o b $@
 
 src/%.o: src/%.c
 	mb-gcc -Wall -Os -c $(INCLUDE) $(CFLAGS) -o "$@" "$<"

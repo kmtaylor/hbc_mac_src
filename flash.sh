@@ -1,2 +1,3 @@
-impact -batch gen_prom.impact
-impact -batch program.impact
+impact -batch impact/gen_prom.impact
+impact -batch impact/flash.impact
+rm _impact*

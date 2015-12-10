@@ -4,6 +4,7 @@
 
 #include "mem.h"
 
+#if USE_MEM
 static XIOModule *mem_io_mod;
 
 void mem_init(XIOModule *io_mod) {
@@ -44,3 +45,38 @@ void mem_write(uint32_t data) {
 uint32_t mem_read(void) {
     return XIOModule_IoReadWord(mem_io_mod, HEX(MEM_RD_WR_ADDR));
 }
+#else /* USE_MEM */
+static uint32_t val;
+
+void mem_init(XIOModule *io_mod) {
+}
+
+void mem_set_wr_p(uint32_t data) {
+}
+
+uint32_t mem_get_wr_p(void) {
+    return 0;
+}
+
+void mem_set_rd_p(uint32_t data) {
+    val = 0;
+}
+
+uint32_t mem_get_rd_p(void) {
+    return 0;
+}
+
+void mem_set_flags(uint8_t flags) {
+}
+
+uint8_t mem_get_flags(void) {
+    return 0;
+}
+
+void mem_write(uint32_t data) {
+}
+
+uint32_t mem_read(void) {
+    return val++;
+}
+#endif /* USE_MEM */

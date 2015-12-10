@@ -20,22 +20,25 @@ struct s_int_handler {
 
 extern void add_int_handler(int_handler_t *new_handler);
 
-#define ADD_INTERRUPT_HANDLER(int_no) add_int_handler(&__##int_no##_struct)
+#define _ADD_INTERRUPT_HANDLER(int_no) add_int_handler(&__##int_no##_struct)
+#define ADD_INTERRUPT_HANDLER(int_no) _ADD_INTERRUPT_HANDLER(int_no)
 
 #define ADD_INTERRUPT(int_no) enable_disable_interrupt(int_no, 1)
 
 #define REM_INTERRUPT(int_no) enable_disable_interrupt(int_no, 0)
 
-#define DECLARE_HANDLER(int_no, handler_func)  \
+#define _DECLARE_HANDLER(int_no, handler_func)  \
 	static int_handler_t __##int_no##_struct = {			    \
 	    .irq_line = int_no,						    \
 	    .func = handler_func,					    \
 	}
+#define DECLARE_HANDLER(int_no, handler_func) \
+	_DECLARE_HANDLER(int_no, handler_func)
 
-#define int_dbg 1
+#define int_dbg 0
 #define int_dbg_sleep 0
 #define int_dbg_led 0
-#define int_dbg_freeze 1
+#define int_dbg_freeze 0
 
 #if int_dbg_freeze
 #define int_freeze() _int_freeze()
