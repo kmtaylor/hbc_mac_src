@@ -1,10 +1,8 @@
 #define MEM_READ_DOWN  0x02
 #define MEM_WRITE_DOWN 0x01
 
-#define MEM_STATUS_GPIO	    1
+#define MEM_STATUS_GPIO	    INT(IRQ_GPI)
 #define MEM_PHY_INIT	    0x100
-
-#define MEM_FIFO_FULL(status) (status & (1 << 9))
 
 extern void mem_init(XIOModule *io_mod);
 

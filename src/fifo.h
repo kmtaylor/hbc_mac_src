@@ -1,14 +1,8 @@
-#define FIFO_STATUS_GPIO 1
-#define FIFO_TRIGGER_GPIO 1
+#define FIFO_STATUS_GPIO	    INT(HBC_GPIO)
+#define FIFO_TRIGGER_GPIO	    INT(HBC_GPIO)
 
-#define FIFO_TRIGGER		    (1 << 0)
-#define FIFO_FLUSH		    (1 << 5)
-
-#define FIFO_FULL(status)	    (status & (1 << INT(IRQ_FIFO_FULL)))
-#define FIFO_ALMOST_FULL(status)    (status & (1 << INT(IRQ_FIFO_ALMOST_FULL)))
-#define FIFO_OVERFLOW(status)	    (status & (1 << INT(IRQ_FIFO_OVERFLOW)))
-#define FIFO_EMPTY(status)	    (status & (1 << INT(IRQ_FIFO_EMPTY)))
-#define FIFO_UNDERFLOW(status)	    (status & (1 << INT(IRQ_FIFO_UNDERFLOW)))
+#define FIFO_TRIGGER		    (1 << INT(GPO_HBC_TX_TRIGGER))
+#define FIFO_FLUSH		    (1 << INT(GPO_HBC_TX_FLUSH))
 
 extern int fifo_writing;
 extern void fifo_init(XIOModule *io_mod);

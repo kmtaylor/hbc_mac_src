@@ -1,13 +1,9 @@
 #include "interrupt.h"
 
-#define USB_STATUS_GPIO 1
-#define USB_TRIGGER_GPIO 1
+#define USB_STATUS_GPIO		    INT(IRQ_GPI)
+#define USB_TRIGGER_GPIO	    INT(GPP_USB_PKT_END)
 
-#define USB_TRIGGER		    (1 << 1)
-
-#define USB_FULL(status)	    (status & (1 << 11))
-#define	USB_EMPTY(status)	    (status & (1 << 13))
-#define USB_ENABLED(status)	    (status & (1 << 12))
+#define USB_TRIGGER		    (1 << INT(GPO_USB_PKT_END))
 
 extern void usb_init(XIOModule *io_mod);
 

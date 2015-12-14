@@ -34,7 +34,7 @@ static void rx_data_int_func(void) {
 	sum = 0;
     }
 
-    while (RX_DATA_READY(check_status())) {
+    while (IRQ_STATUS(IRQ_RX_DATA_READY, check_status())) {
 	val = fifo_read();
 	sum += val ^ scrambler_read();
     }
@@ -43,7 +43,7 @@ static void rx_data_int_func(void) {
 }
 
 static void rx_ready_int_func(void) {
-    if (RX_DATA_READY(check_status())) {
+    if (IRQ_STATUS(IRQ_RX_DATA_READY, check_status())) {
 	/* If there is any data left, read out the last bytes */
 	rx_data_int_func();
     }
@@ -53,13 +53,11 @@ static void rx_ready_int_func(void) {
     lcd_printf(0, "Packet Complete");
 }
 
-#define RX_FIFO_FULL_INT_NO INT(IRQ_RX_FIFO_FULL)
-#define RX_READY_INT_NO INT(IRQ_RX_PKT_READY)
-DECLARE_HANDLER(RX_FIFO_FULL_INT_NO, rx_data_int_func);
-DECLARE_HANDLER(RX_READY_INT_NO, rx_ready_int_func);
+DECLARE_HANDLER(INT(IRQ_RX_FIFO_FULL), rx_data_int_func);
+DECLARE_HANDLER(INT(IRQ_RX_PKT_READY), rx_ready_int_func);
 
 void rx_init(XIOModule *io_mod) {
     rx_io_mod = io_mod;
-    ADD_INTERRUPT_HANDLER(RX_FIFO_FULL_INT_NO);
-    ADD_INTERRUPT_HANDLER(RX_READY_INT_NO);
+    ADD_INTERRUPT_HANDLER(INT(IRQ_RX_FIFO_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_RX_PKT_READY));
 }

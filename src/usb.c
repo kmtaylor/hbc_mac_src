@@ -16,7 +16,7 @@ static void check_status(void) {
 
 void usb_write(uint32_t data) {
     check_status();
-    if (!USB_FULL(usb_status))
+    if (!IRQ_STATUS(IRQ_USB_FULL, usb_status))
         XIOModule_IoWriteWord(usb_io_mod, HEX(USB_ADDR), data);
 }
 

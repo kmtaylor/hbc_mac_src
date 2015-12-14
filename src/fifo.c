@@ -50,13 +50,13 @@ void fifo_init(XIOModule *io_mod) {
 
 void fifo_write(uint32_t data) {
     /* Block until write is available */
-    while (FIFO_FULL(check_status()));
+    while (IRQ_STATUS(IRQ_TX_FIFO_FULL, check_status()));
     XIOModule_IoWriteWord(fifo_io_mod, HEX(FIFO_ADDR), data);
 }
 
 void fifo_modulate(uint32_t data) {
     /* Block until write is available */
-    while (FIFO_ALMOST_FULL(check_status())) fifo_trigger();
+    while (IRQ_STATUS(IRQ_TX_FIFO_ALMOST_FULL, check_status())) fifo_trigger();
     XIOModule_IoWriteWord(fifo_io_mod, HEX(MODULATOR_ADDR), data);
 }
 
