@@ -14,6 +14,7 @@ INCLUDE += -I$(HDL_LOCATION)
 
 CFLAGS += -mno-xl-reorder -mlittle-endian -mcpu=v8.40.a -mxl-soft-mul \
 	  -ffunction-sections -fdata-sections
+CFLAGS += -DUSE_MEM=1
 
 LDFLAGS += -Wl,-T -Wl,src/lscript.ld -Wl,--gc-sections \
 	   -L$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/lib

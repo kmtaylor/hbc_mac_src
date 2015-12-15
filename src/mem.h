@@ -2,7 +2,7 @@
 #define MEM_WRITE_DOWN 0x01
 
 #define MEM_STATUS_GPIO	    INT(IRQ_GPI)
-#define MEM_PHY_INIT	    0x100
+#define MEM_PHY_INIT	    (1 << INT(IRQ_RAM_INIT))
 
 extern void mem_init(XIOModule *io_mod);
 

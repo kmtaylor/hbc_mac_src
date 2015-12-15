@@ -1,3 +1,10 @@
+/* Bring up:
+ * mem_if/ddr
+ * data spi
+ * hbc_tx
+ * hbc_rx
+ */
+
 #include <stdint.h>
 #include <string.h>
 #include <xiomodule.h>
@@ -7,15 +14,55 @@
 #include "fifo.h"
 #include "usb.h"
 #include "spi.h"
+#include "spi_protocol.h"
 #include "mem.h"
 #include "build_tx.h"
 #include "scrambler.h"
 #include "interrupt.h"
 #include "extract_rx.h"
 
-static void sleep(int length) {
-    volatile int counter = length;
-    while (counter) counter--;
+enum ctrl_state {
+    CTRL_STATE_CMD,
+    CTRL_STATE_REPLY,
+};
+
+static void ctrl_cmd(uint8_t cmd) {
+    static enum ctrl_state state;
+    static uint8_t bytes;
+    static uint32_t data;
+    
+    if (cmd & 0x80) state = CTRL_STATE_CMD;
+
+    switch (state) {
+	case CTRL_STATE_CMD:
+	    switch (cmd) {
+		case CTRL_CMD_READ_SCRAMBLER:
+		    bytes = 4;
+		    data = scrambler_read();
+		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_READ_MEM:
+		    bytes = 4;
+		    mem_write(0x12345678);
+		    data = mem_read();
+		    state = CTRL_STATE_REPLY;
+		    break;
+	    }
+	    break;
+	case CTRL_STATE_REPLY:
+	    switch (cmd) {
+		case CTRL_CMD_DATA_NEXT:
+		    if (bytes) {
+			hbc_ctrl_write((data >> 24) | (CTRL_STATUS_OK << 8));
+			data <<= 8;
+			bytes--;
+		    }
+		    break;
+		case CTRL_CMD_DATA:
+		    hbc_ctrl_write(CTRL_STATUS_EMPTY << 8);
+	    }
+	    break;
+    }
 }
 
 int main() {
@@ -28,7 +75,7 @@ int main() {
     fifo_init(&io_mod);
     mem_init(&io_mod);
     scrambler_init(&io_mod);
-    hbc_spi_init(&io_mod);
+    hbc_spi_init(&io_mod, ctrl_cmd);
     //rx_init(&io_mod);
 
     setup_interrupts(&io_mod);
@@ -38,10 +85,6 @@ int main() {
     enable_interrupts();
 
     while (1) {
-//	XIOModule_DiscreteClear(&io_mod, 1, (1 << 7));
-//	sleep(50E5);
-//	XIOModule_DiscreteSet(&io_mod, 1, (1 << 7));
-//	sleep(50E5);
     }
 
 #if 0
