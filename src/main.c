@@ -1,5 +1,4 @@
 /* Bring up:
- * mem_if/ddr
  * data spi
  * hbc_tx
  * hbc_rx
@@ -10,6 +9,7 @@
 #include <xiomodule.h>
 #include <preprocessor/constants.vhh>
 
+#include "gpio.h"
 #include "lcd.h"
 #include "fifo.h"
 #include "usb.h"
@@ -20,6 +20,8 @@
 #include "scrambler.h"
 #include "interrupt.h"
 #include "extract_rx.h"
+
+XIOModule io_mod;
 
 enum ctrl_state {
     CTRL_STATE_CMD,
@@ -43,7 +45,6 @@ static void ctrl_cmd(uint8_t cmd) {
 		    break;
 		case CTRL_CMD_READ_MEM:
 		    bytes = 4;
-		    mem_write(0x12345678);
 		    data = mem_read();
 		    state = CTRL_STATE_REPLY;
 		    break;
@@ -66,23 +67,27 @@ static void ctrl_cmd(uint8_t cmd) {
 }
 
 int main() {
-    //int i;
-    //uint32_t switch_val;
-    XIOModule io_mod;
+    int i;
 
     XIOModule_Initialize(&io_mod, XPAR_IOMODULE_0_DEVICE_ID);
 
-    fifo_init(&io_mod);
-    mem_init(&io_mod);
-    scrambler_init(&io_mod);
-    hbc_spi_init(&io_mod, ctrl_cmd);
-    //rx_init(&io_mod);
+    fifo_init();
+    mem_init();
+    hbc_spi_init(ctrl_cmd);
+    rx_init();
 
-    setup_interrupts(&io_mod);
+    setup_interrupts();
     //ADD_INTERRUPT(INT(IRQ_RX_FIFO_FULL));
     //ADD_INTERRUPT(INT(IRQ_RX_PKT_READY));
     ADD_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
+
+    for (i = 0; i < 64; i++) {
+	mem_write(i);
+    }
+
+    GPO_CLEAR(HBC_DATA_INT);
+    GPO_OUT(HBC_DATA_INT);
 
     while (1) {
     }
@@ -95,14 +100,8 @@ int main() {
         .PDSU_length = 255
     };
 
-    for (i = 0; i < 64; i++) {
-	mem_write(i);
-    }
-
     while (1) {
 	int_pause(1);
-
-	switch_val = XIOModule_DiscreteRead(&io_mod, 2);
 
 	if (switch_val & (1 << 7)) header_info.use_ri = 1;
 	else header_info.use_ri = 0;
@@ -111,7 +110,6 @@ int main() {
 
 	mem_set_rd_p(0);
 
-#if 1
 	if (header_info.use_ri) {
 	    if (header_info.data_rate == 0) lcd_printf(0, "Rate: 64CPB, RI");
 	    if (header_info.data_rate == 1) lcd_printf(0, "Rate: 32CPB, RI");
@@ -123,7 +121,6 @@ int main() {
 	    if (header_info.data_rate == 2) lcd_printf(0, "Rate: 16CPB, SFD");
 	    if (header_info.data_rate == 3) lcd_printf(0, "Rate: 08CPB, SFD");
 	}
-#endif
 
 	disable_interrupts();
 	build_tx_plcp_header(&header_info);

@@ -2,9 +2,8 @@
 #include <xiomodule.h>
 #include <preprocessor/constants.vhh>
 
+#include "gpio.h"
 #include "lcd.h"
-
-static XIOModule *lcd_io_mod;
 
 static void sleep(void) {
     volatile int counter = 10E3;
@@ -13,37 +12,36 @@ static void sleep(void) {
 
 static void lcd_busy(void) {
     /* Have to wait 80us before checking busy flag */
-    while (XIOModule_IoReadByte(lcd_io_mod, HEX(LCD_CMD_ADDR)) & 0x80) {}
+    while (XIOModule_IoReadByte(&io_mod, HEX(LCD_CMD_ADDR)) & 0x80) {}
 }
 
-void lcd_init(XIOModule *io_mod) {
-    lcd_io_mod = io_mod;
+void lcd_init(void) {
     /* Function set */
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x38);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x38);
     sleep();
     /* Function set */
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x38);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x38);
     sleep();
     /* Display on, Cursor on */
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x0c);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x0c);
     sleep();
     /* Clear display */
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x01);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x01);
     sleep();
     /* Entry mode set */
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x06);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x06);
     sleep();
 }
 
 void lcd_cr(int line) {
     lcd_busy();
-    if (line == 0) XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x80);
-    if (line == 1) XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0xC0);
+    if (line == 0) XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x80);
+    if (line == 1) XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0xC0);
 }
 
 void lcd_clear(void) {
     lcd_busy();
-    XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_CMD_ADDR), 0x01);
+    XIOModule_IoWriteByte(&io_mod, HEX(LCD_CMD_ADDR), 0x01);
 }
 
 void lcd_clrln(int line) {
@@ -53,7 +51,7 @@ void lcd_clrln(int line) {
 
     for (i = 0; i < LCD_COLUMNS ; i++) {
 	lcd_busy();
-	XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_DATA_ADDR), ' ');
+	XIOModule_IoWriteByte(&io_mod, HEX(LCD_DATA_ADDR), ' ');
     }
 }
 
@@ -67,7 +65,7 @@ void lcd_printf(int line, const char *string) {
     for (i = 0; i < LCD_COLUMNS; i++) {
 	if (!string[i]) return;
 	lcd_busy();
-	XIOModule_IoWriteByte(lcd_io_mod, HEX(LCD_DATA_ADDR), string[i]);
+	XIOModule_IoWriteByte(&io_mod, HEX(LCD_DATA_ADDR), string[i]);
     }
 }
 

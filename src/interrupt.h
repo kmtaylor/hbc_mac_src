@@ -3,7 +3,7 @@
 
 typedef int irq_line_t;
 
-extern void setup_interrupts(XIOModule *io_mod);
+extern void setup_interrupts(void);
 extern void enable_disable_interrupt(irq_line_t int_no, int enable);
 extern void enable_interrupts(void);
 extern void disable_interrupts(void);
@@ -34,6 +34,9 @@ extern void add_int_handler(int_handler_t *new_handler);
 	}
 #define DECLARE_HANDLER(int_no, handler_func) \
 	_DECLARE_HANDLER(int_no, handler_func)
+
+#define IRQ_FLAG_SET(irq) \
+	IRQ_STATUS(irq, XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI)))
 
 #define int_dbg 0
 #define int_dbg_sleep 0

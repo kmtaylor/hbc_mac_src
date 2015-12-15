@@ -3,6 +3,7 @@
 #include <xiomodule.h>
 #include <preprocessor/constants.vhh>
 
+#include "gpio.h"
 #include "interrupt.h"
 #include "fifo.h"
 #include "lcd.h"
@@ -10,22 +11,15 @@
 #include "scrambler.h"
 #include "build_tx.h"
 
-extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
+static uint32_t sum;
 
-static XIOModule *rx_io_mod;
-
-static inline uint32_t check_status(void) {
-    return XIOModule_DiscreteRead(rx_io_mod, RX_FIFO_GPIO);
+uint32_t rx_read(void) {
+    return sum;
 }
-
-//uint32_t rx_read(void) {
-    //
-//}
 
 static enum { packet_init, packet_reading } rx_state = packet_init;
 
 static void rx_data_int_func(void) {
-    static uint32_t sum;
     static uint32_t val;
 
     if (rx_state == packet_init) {
@@ -34,30 +28,26 @@ static void rx_data_int_func(void) {
 	sum = 0;
     }
 
-    while (IRQ_STATUS(IRQ_RX_DATA_READY, check_status())) {
+    while (IRQ_FLAG_SET(IRQ_RX_DATA_READY)) {
 	val = fifo_read();
 	sum += val ^ scrambler_read();
     }
-
-    PRINT_NUM(1, "ChkSum:", sum);
 }
 
 static void rx_ready_int_func(void) {
-    if (IRQ_STATUS(IRQ_RX_DATA_READY, check_status())) {
+    if (IRQ_FLAG_SET(IRQ_RX_DATA_READY)) {
 	/* If there is any data left, read out the last bytes */
 	rx_data_int_func();
     }
     rx_state = packet_init;
-    XIOModule_DiscreteSet(rx_io_mod, RX_FIFO_GPIO, RX_PKT_ACK);
-    XIOModule_DiscreteClear(rx_io_mod, RX_FIFO_GPIO, RX_PKT_ACK);
-    lcd_printf(0, "Packet Complete");
+    GPO_SET(HBC_RX_PKT_ACK);
+    GPO_CLEAR(HBC_RX_PKT_ACK);
 }
 
 DECLARE_HANDLER(INT(IRQ_RX_FIFO_FULL), rx_data_int_func);
 DECLARE_HANDLER(INT(IRQ_RX_PKT_READY), rx_ready_int_func);
 
-void rx_init(XIOModule *io_mod) {
-    rx_io_mod = io_mod;
+void rx_init(void) {
     ADD_INTERRUPT_HANDLER(INT(IRQ_RX_FIFO_FULL));
     ADD_INTERRUPT_HANDLER(INT(IRQ_RX_PKT_READY));
 }

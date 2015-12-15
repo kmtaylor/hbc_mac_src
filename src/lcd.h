@@ -1,7 +1,7 @@
 #define LCD_ROWS 2
 #define LCD_COLUMNS 16
 
-extern void lcd_init(XIOModule *io_mod);
+extern void lcd_init(void);
 
 extern void lcd_cr(int line);
 extern void lcd_clear(void);

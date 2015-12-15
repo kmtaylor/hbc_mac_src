@@ -3,6 +3,7 @@
 #include <xiomodule.h>
 #include <preprocessor/constants.vhh>
 
+#include "gpio.h"
 #include "interrupt.h"
 #include "lcd.h"
 #include "fifo.h"
@@ -12,7 +13,6 @@ extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
 static volatile int do_pause;
 
 static int_handler_t *int_handler_list = NULL;
-static XIOModule *int_io_mod;
 static uint32_t interrupt_mask;
 
 #if int_dbg_sleep
@@ -115,15 +115,14 @@ static void int_handler(void *io_mod_p) {
     }
 }
 
-void setup_interrupts(XIOModule *io_mod) {
-    int_io_mod = io_mod;
-    microblaze_register_handler(int_handler, io_mod);
+void setup_interrupts(void) {
+    microblaze_register_handler(int_handler, &io_mod);
 }
 
 void enable_disable_interrupt(irq_line_t int_no, int enable) {
     if (enable) interrupt_mask |= (1 << (int_no + 16));
     else interrupt_mask &= ~(1 << (int_no + 16));
-    XIOModule_EnableIntr(int_io_mod->BaseAddress, interrupt_mask);
+    XIOModule_EnableIntr(io_mod.BaseAddress, interrupt_mask);
 }
 
 void enable_interrupts(void) {
