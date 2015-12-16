@@ -28,6 +28,41 @@ enum ctrl_state {
     CTRL_STATE_REPLY,
 };
 
+static void sleep(void) {
+    volatile int counter = 10E3;
+    while (counter) counter--;
+}
+
+static void mem_test(void) {
+    int i, mem, scram;
+
+    mem_set_flags(0);
+    mem_set_wr_p(0);
+    scrambler_reseed(0);
+    for (i = 0; i < 64; i++) {
+	mem_write(i); //scrambler_read());
+    }
+    mem_set_rd_p(0);
+    scrambler_reseed(0);
+    for (i = 0; i < 64; i++) {
+	mem = mem_read();
+	scram = i; //scrambler_read();
+	if (mem != scram) {
+	    hbc_data_write(i);			sleep();
+	    hbc_data_write(mem >> 24);		sleep();
+	    hbc_data_write(mem >> 16);		sleep();
+	    hbc_data_write(mem >> 8);		sleep();
+	    hbc_data_write(mem >> 0);		sleep();
+	    hbc_data_write(scram >> 24);	sleep();
+	    hbc_data_write(scram >> 16);	sleep();
+	    hbc_data_write(scram >> 8);		sleep();
+	    hbc_data_write(scram >> 0);		sleep();
+	}
+    }
+    mem_set_rd_p(0);
+    scrambler_reseed(0);
+}
+
 static void ctrl_cmd(uint8_t cmd) {
     static enum ctrl_state state;
     static uint8_t bytes;
@@ -47,6 +82,9 @@ static void ctrl_cmd(uint8_t cmd) {
 		    bytes = 4;
 		    data = mem_read();
 		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_TEST_MEM:
+		    mem_test();
 		    break;
 	    }
 	    break;
@@ -82,12 +120,9 @@ int main() {
     ADD_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
 
-    for (i = 0; i < 64; i++) {
+    for (i = 0; i < 64 ; i++) {
 	mem_write(i);
     }
-
-    GPO_CLEAR(HBC_DATA_INT);
-    GPO_OUT(HBC_DATA_INT);
 
     while (1) {
     }

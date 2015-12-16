@@ -10,4 +10,5 @@ enum ctrl_command {
 
     CTRL_CMD_READ_SCRAMBLER = 0x80,
     CTRL_CMD_READ_MEM	    = 0x81,
+    CTRL_CMD_TEST_MEM	    = 0x82,
 };

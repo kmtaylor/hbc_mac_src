@@ -1,5 +1,5 @@
-#define MEM_READ_DOWN  0x02
-#define MEM_WRITE_DOWN 0x01
+#define MEM_READ_WRAP_16M   0x02
+#define MEM_WRITE_WRAP_16M  0x01
 
 extern void mem_init(void);
 
