@@ -28,38 +28,27 @@ enum ctrl_state {
     CTRL_STATE_REPLY,
 };
 
-static void sleep(void) {
-    volatile int counter = 10E3;
-    while (counter) counter--;
-}
-
 static void mem_test(void) {
     int i, mem, scram;
+    int errors = 0;
 
     mem_set_flags(0);
     mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 64; i++) {
-	mem_write(i); //scrambler_read());
+    for (i = 0; i < 1024*1024*8; i++) { //*1024*8; i++) {
+	mem_write(scrambler_read());
     }
     mem_set_rd_p(0);
+    mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 64; i++) {
+    for (i = 0; i < 1024*1024*8; i++) { //*1024*8; i++) {
 	mem = mem_read();
-	scram = i; //scrambler_read();
-	if (mem != scram) {
-	    hbc_data_write(i);			sleep();
-	    hbc_data_write(mem >> 24);		sleep();
-	    hbc_data_write(mem >> 16);		sleep();
-	    hbc_data_write(mem >> 8);		sleep();
-	    hbc_data_write(mem >> 0);		sleep();
-	    hbc_data_write(scram >> 24);	sleep();
-	    hbc_data_write(scram >> 16);	sleep();
-	    hbc_data_write(scram >> 8);		sleep();
-	    hbc_data_write(scram >> 0);		sleep();
-	}
+	scram = scrambler_read();
+	if (mem != scram) errors++;
     }
+    hbc_data_write(errors > 0xff ? 0xff : errors);
     mem_set_rd_p(0);
+    mem_set_wr_p(0);
     scrambler_reseed(0);
 }
 
@@ -105,7 +94,6 @@ static void ctrl_cmd(uint8_t cmd) {
 }
 
 int main() {
-    int i;
 
     XIOModule_Initialize(&io_mod, XPAR_IOMODULE_0_DEVICE_ID);
 
@@ -119,10 +107,6 @@ int main() {
     //ADD_INTERRUPT(INT(IRQ_RX_PKT_READY));
     ADD_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
-
-    for (i = 0; i < 64 ; i++) {
-	mem_write(i);
-    }
 
     while (1) {
     }
