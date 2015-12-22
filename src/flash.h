@@ -31,5 +31,6 @@ extern uint8_t flash_transfer(uint8_t data);
 extern uint32_t flash_get_id(void);
 extern void flash_read(uint32_t mem_addr);
 extern void flash_write(uint32_t mem_addr, uint32_t size);
+extern int flash_verify(uint32_t mem_addr, uint32_t size);
 
 extern uint8_t flash_read_status(void);

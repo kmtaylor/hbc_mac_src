@@ -65,7 +65,7 @@ static void ctrl_cmd(uint8_t cmd) {
 	    switch (cmd) {
 		case CTRL_CMD_READ_SCRAMBLER:
 		    bytes = 4;
-		    data = flash_read_status();
+		    data = scrambler_read();
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_READ_MEM:
@@ -77,8 +77,9 @@ static void ctrl_cmd(uint8_t cmd) {
 		    mem_test(256);
 		    break;
 		case CTRL_CMD_WRITE_FLASH:
-		    flash_write(0, 256);
-		    hbc_data_write(CTRL_CMD_WRITE_FLASH);
+		    flash_write(0, 340604);
+		    data = flash_verify(0, 340604);
+		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_READ_FLASH:
 		    flash_read(0);

@@ -30,7 +30,7 @@ static void flash_write_enable(void) {
 }
 
 static void flash_bulk_erase(void) {
-    flas_write_enable();
+    flash_write_enable();
     flash_start();
     flash_transfer(FLASH_BULK_ERASE);
     flash_end();
@@ -88,6 +88,36 @@ void flash_read(uint32_t mem_addr) {
     flash_end();
 }
 
+int flash_verify(uint32_t mem_addr, uint32_t size) {
+    uint32_t i;
+    uint32_t data;
+    int retval = 0;
+
+    mem_set_rd_p(mem_addr);
+
+    flash_start();
+    flash_transfer(FLASH_READ_DATA);
+    flash_transfer(0);
+    flash_transfer(0);
+    flash_transfer(0);
+
+    for (i = 0; i < size/4; i++) {
+	data = 0;
+	data |= flash_transfer(0x00);
+	data <<= 8;
+	data |= flash_transfer(0x00);
+	data <<= 8;
+	data |= flash_transfer(0x00);
+	data <<= 8;
+	data |= flash_transfer(0x00);
+	if (data != mem_read()) retval = -1;
+    }
+    
+    flash_end();
+
+    return retval;
+}
+
 void flash_write(uint32_t mem_addr, uint32_t size) {
     uint32_t i, page, pages, data;
 
@@ -95,7 +125,7 @@ void flash_write(uint32_t mem_addr, uint32_t size) {
     flash_bulk_erase();
 
     pages = size/PAGE_SIZE;
-    if (pages % PAGE_SIZE) pages++;
+    if (size % PAGE_SIZE) pages++;
 
     mem_set_rd_p(mem_addr);
 
