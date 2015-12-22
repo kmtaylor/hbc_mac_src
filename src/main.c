@@ -28,20 +28,20 @@ enum ctrl_state {
     CTRL_STATE_REPLY,
 };
 
-static void mem_test(void) {
-    int i, mem, scram;
-    int errors = 0;
+static void mem_test(uint32_t bytes) {
+    uint32_t i, mem, scram;
+    uint32_t errors = 0;
 
     mem_set_flags(0);
     mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 1024*1024*8; i++) {
+    for (i = 0; i < bytes/4; i++) {
 	mem_write(scrambler_read());
     }
     mem_set_rd_p(0);
     mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 1024*1024*8; i++) {
+    for (i = 0; i < bytes/4; i++) {
 	mem = mem_read();
 	scram = scrambler_read();
 	if (mem != scram) errors++;
@@ -65,17 +65,25 @@ static void ctrl_cmd(uint8_t cmd) {
 	    switch (cmd) {
 		case CTRL_CMD_READ_SCRAMBLER:
 		    bytes = 4;
-		    data = scrambler_read();
+		    data = flash_read_status();
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_READ_MEM:
 		    bytes = 4;
-		    //data = mem_read();
-		    data = flash_get_id();
+		    data = mem_read();
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_TEST_MEM:
-		    mem_test();
+		    mem_test(256);
+		    break;
+		case CTRL_CMD_WRITE_FLASH:
+		    flash_write(0, 256);
+		    hbc_data_write(CTRL_CMD_WRITE_FLASH);
+		    break;
+		case CTRL_CMD_READ_FLASH:
+		    flash_read(0);
+		    mem_set_rd_p(0);
+		    hbc_data_write(CTRL_CMD_READ_FLASH);
 		    break;
 	    }
 	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
