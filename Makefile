@@ -24,6 +24,7 @@ OBJS += \
 	src/mem.o \
 	src/usb.o \
 	src/spi.o \
+	src/flash.o \
 	src/lcd.o \
 	src/build_tx.o \
 	src/interrupt.o \

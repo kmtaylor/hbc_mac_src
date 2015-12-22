@@ -1,5 +1,4 @@
 /* Bring up:
- * data spi
  * hbc_tx
  * hbc_rx
  */
@@ -15,6 +14,7 @@
 #include "usb.h"
 #include "spi.h"
 #include "spi_protocol.h"
+#include "flash.h"
 #include "mem.h"
 #include "build_tx.h"
 #include "scrambler.h"
@@ -35,13 +35,13 @@ static void mem_test(void) {
     mem_set_flags(0);
     mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 1024*1024*8; i++) { //*1024*8; i++) {
+    for (i = 0; i < 1024*1024*8; i++) {
 	mem_write(scrambler_read());
     }
     mem_set_rd_p(0);
     mem_set_wr_p(0);
     scrambler_reseed(0);
-    for (i = 0; i < 1024*1024*8; i++) { //*1024*8; i++) {
+    for (i = 0; i < 1024*1024*8; i++) {
 	mem = mem_read();
 	scram = scrambler_read();
 	if (mem != scram) errors++;
@@ -61,6 +61,7 @@ static void ctrl_cmd(uint8_t cmd) {
 
     switch (state) {
 	case CTRL_STATE_CMD:
+	    hbc_ctrl_write(CTRL_STATUS_EMPTY << 8);
 	    switch (cmd) {
 		case CTRL_CMD_READ_SCRAMBLER:
 		    bytes = 4;
@@ -69,13 +70,15 @@ static void ctrl_cmd(uint8_t cmd) {
 		    break;
 		case CTRL_CMD_READ_MEM:
 		    bytes = 4;
-		    data = mem_read();
+		    //data = mem_read();
+		    data = flash_get_id();
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_TEST_MEM:
 		    mem_test();
 		    break;
 	    }
+	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
 	    break;
 	case CTRL_STATE_REPLY:
 	    switch (cmd) {
@@ -100,6 +103,7 @@ int main() {
     fifo_init();
     mem_init();
     hbc_spi_init(ctrl_cmd);
+    flash_init();
     rx_init();
 
     setup_interrupts();

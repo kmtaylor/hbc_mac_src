@@ -1,6 +1,7 @@
 enum ctrl_status {
-    CTRL_STATUS_EMPTY   = 0x00,
-    CTRL_STATUS_OK      = 0x80,
+    CTRL_STATUS_EMPTY	    = 0x00,
+    CTRL_STATUS_OK	    = 0x80,
+    CTRL_STATUS_CMD_DONE    = 0x40,
 };
 
 enum ctrl_command {
