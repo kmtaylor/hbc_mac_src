@@ -8,84 +8,8 @@
 #include "lcd.h"
 #include "fifo.h"
 
-extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
-
-static volatile int do_pause;
-
 static int_handler_t *int_handler_list = NULL;
 static uint32_t interrupt_mask;
-
-#if int_dbg_sleep
-static void sleep(void) {
-    volatile int counter = 10E6;
-    while (counter) counter--;
-}
-#endif
-
-#if int_dbg_freeze
-void _int_freeze(void) {
-    while (1);
-}
-#endif
-
-#if int_dbg
-void _int_pause(int init_pause) {
-    if (init_pause) do_pause = 1;
-    while (do_pause) {}
-}
-
-void print_interrupt_info(XIOModule *io_mod, irq_line_t irq_line) {
-    /* Debug IRQ */
-#if int_dbg_led
-    uint32_t dbg_led;
-    dbg_led = XIOModule_DiscreteRead(io_mod, 1);
-    //dbg_led >>= 8;
-    XIOModule_DiscreteWrite(io_mod, 2, dbg_led); 
-#endif
-
-    lcd_clrln(0);
-
-    switch (irq_line) {
-	case INT(IRQ_BUTTON_2):
-	    PRINT_NUM(0, "DBG Int:", XIOModule_DiscreteRead(io_mod, 1));
-	    do_pause = 0;
-	    break;
-	case INT(IRQ_FIFO_FULL): 
-	    lcd_printf(0, "FIFO full");
-	    break;
-	case INT(IRQ_CLOCK_LOSS):
-	    lcd_printf(0, "Lost clock lock");
-	    int_freeze();
-	    break;
-	case INT(IRQ_RAM_INIT):
-	    lcd_printf(0, "RAM not ready");
-	    break;
-	case INT(IRQ_RAM_FIFO_FULL):
-	    lcd_printf(0, "RAM FIFO full");
-	    break;
-	case INT(IRQ_USB_INT):
-	    lcd_printf(0, "USB IRQ");
-	    break;
-	case INT(IRQ_USB_FULL):
-	    lcd_printf(0, "USB Full");
-	    break;
-	case INT(IRQ_USB_EN):
-	    lcd_printf(0, "USB Enabled");
-	    break;
-	case INT(IRQ_USB_EMPTY):
-	    lcd_printf(0, "USB Empty");
-	    break;
-	case INT(IRQ_BUTTON):
-	    PRINT_NUM(1, "FIFO_RD:", fifo_read());
-	    break;
-	default :
-	    break;
-    }
-#if int_dbg_sleep
-    sleep();
-#endif
-}
-#endif /* int_dbg */
 
 static void int_handler(void *io_mod_p) {
     uint32_t pending_mask;
@@ -104,7 +28,7 @@ static void int_handler(void *io_mod_p) {
     /* Acknowledge this interrupt */
     XIOModule_AckIntr(io_mod->BaseAddress, (1 << (irq_line + 16)));
 
-#if int_dbg
+#if INT_DBG
     print_interrupt_info(io_mod, irq_line);
 #endif
 

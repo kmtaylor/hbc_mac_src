@@ -23,9 +23,9 @@ extern void add_int_handler(int_handler_t *new_handler);
 #define _ADD_INTERRUPT_HANDLER(int_no) add_int_handler(&__##int_no##_struct)
 #define ADD_INTERRUPT_HANDLER(int_no) _ADD_INTERRUPT_HANDLER(int_no)
 
-#define ADD_INTERRUPT(int_no) enable_disable_interrupt(int_no, 1)
+#define ENABLE_INTERRUPT(int_no) enable_disable_interrupt(int_no, 1)
 
-#define REM_INTERRUPT(int_no) enable_disable_interrupt(int_no, 0)
+#define DISABLE_INTERRUPT(int_no) enable_disable_interrupt(int_no, 0)
 
 #define _DECLARE_HANDLER(int_no, handler_func)  \
 	static int_handler_t __##int_no##_struct = {			    \
@@ -38,18 +38,18 @@ extern void add_int_handler(int_handler_t *new_handler);
 #define IRQ_FLAG_SET(irq) \
 	IRQ_STATUS(irq, XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI)))
 
-#define int_dbg 0
-#define int_dbg_sleep 0
-#define int_dbg_led 0
-#define int_dbg_freeze 0
+#define INT_DBG 0
+#define INT_DBG_SLEEP 0
+#define INT_DBG_LED 0
+#define INT_DBG_FREEZE 0
 
-#if int_dbg_freeze
+#if INT_DBG_FREEZE
 #define int_freeze() _int_freeze()
 #else
 #define int_freeze() do {} while (0)
 #endif
 
-#if int_dbg
+#if INT_DBG
 #define int_pause(init_pause) _int_pause(init_pause)
 #else
 #define int_pause(init_pause) do {} while (0)

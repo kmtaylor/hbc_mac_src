@@ -8,7 +8,6 @@
 #include "mem.h"
 #include "lcd.h"
 #include "interrupt.h"
-extern char lcd_buf[LCD_ROWS][LCD_COLUMNS];
 #else
 extern void fifo_write(uint32_t data);
 extern uint32_t scrambler_read(void);

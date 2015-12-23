@@ -28,6 +28,8 @@ enum ctrl_state {
     CTRL_STATE_REPLY,
 };
 
+static volatile int send_packet;
+
 static void mem_test(uint32_t bytes) {
     uint32_t i, mem, scram;
     uint32_t errors = 0;
@@ -77,14 +79,22 @@ static void ctrl_cmd(uint8_t cmd) {
 		    mem_test(256);
 		    break;
 		case CTRL_CMD_WRITE_FLASH:
-		    flash_write(0, 340604);
-		    data = flash_verify(0, 340604);
+		    flash_write(0, FPGA_CONFIG_SIZE);
+		    data = flash_verify(0, FPGA_CONFIG_SIZE);
 		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_READ_FLASH:
 		    flash_read(0);
 		    mem_set_rd_p(0);
 		    hbc_data_write(CTRL_CMD_READ_FLASH);
+		    break;
+		case CTRL_CMD_HBC_TRIGGER:
+		    send_packet = 1;
+		    break;
+		case CTRL_CMD_GET_IRQ:
+		    bytes = 4;
+		    data = XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI));
+		    state = CTRL_STATE_REPLY;
 		    break;
 	    }
 	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
@@ -116,50 +126,32 @@ int main() {
     rx_init();
 
     setup_interrupts();
-    //ADD_INTERRUPT(INT(IRQ_RX_FIFO_FULL));
-    //ADD_INTERRUPT(INT(IRQ_RX_PKT_READY));
-    ADD_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
+    //ENABLE_INTERRUPT(INT(IRQ_RX_FIFO_FULL));
+    //ENABLE_INTERRUPT(INT(IRQ_RX_PKT_READY));
+    ENABLE_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
 
-    while (1) {
-    }
-
-#if 0
     plcp_header_t header_info = {
+	.data_rate = r_sf_64,
         .pilot_info = pilot_none,
         .burst_mode = 0,
+	.use_ri = 1,
         .scrambler_seed = 0,
-        .PDSU_length = 255
+        .PDSU_length = 255,
     };
 
     while (1) {
-	int_pause(1);
+	if (send_packet) {
+	    mem_set_rd_p(0);
 
-	if (switch_val & (1 << 7)) header_info.use_ri = 1;
-	else header_info.use_ri = 0;
+	    disable_interrupts();
+	    build_tx_plcp_header(&header_info);
+	    build_tx_payload(&header_info);
+	    enable_interrupts();
 
-	header_info.data_rate = switch_val & 0x3;
-
-	mem_set_rd_p(0);
-
-	if (header_info.use_ri) {
-	    if (header_info.data_rate == 0) lcd_printf(0, "Rate: 64CPB, RI");
-	    if (header_info.data_rate == 1) lcd_printf(0, "Rate: 32CPB, RI");
-	    if (header_info.data_rate == 2) lcd_printf(0, "Rate: 16CPB, RI");
-	    if (header_info.data_rate == 3) lcd_printf(0, "Rate: 08CPB, RI");
-	} else {
-	    if (header_info.data_rate == 0) lcd_printf(0, "Rate: 64CPB, SFD");
-	    if (header_info.data_rate == 1) lcd_printf(0, "Rate: 32CPB, SFD");
-	    if (header_info.data_rate == 2) lcd_printf(0, "Rate: 16CPB, SFD");
-	    if (header_info.data_rate == 3) lcd_printf(0, "Rate: 08CPB, SFD");
+	    send_packet = 0;
 	}
-
-	disable_interrupts();
-	build_tx_plcp_header(&header_info);
-	build_tx_payload(&header_info);
-	enable_interrupts();
     }
 
     return 0;
-#endif
 }

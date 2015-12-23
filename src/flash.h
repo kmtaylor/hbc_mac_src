@@ -6,6 +6,8 @@
 #define FLASH_SIZE		    (512 * 1024)
 #define PAGE_SIZE		    256
 
+#define FPGA_CONFIG_SIZE	    340604
+
 #define FLASH_WRITE_ENABLE	    0x06
 #define FLASH_WRITE_DISABLE	    0x04
 #define FLASH_READ_ID		    0x9F

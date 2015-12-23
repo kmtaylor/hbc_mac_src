@@ -31,21 +31,34 @@ void fifo_write_size(uint8_t size) {
 }
 
 #if 0
-static void fifo_irq_overflow(void) {
-    lcd_printf(0, "FIFO overflow");
-    int_freeze();
+#include "spi.h"
+static void fifo_irq_tx_full(void) {
+    hbc_data_write(0x95);
 }
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_FULL), fifo_irq_tx_full);
 
-DECLARE_HANDLER(IRQ_FIFO_OVERFLOW, fifo_irq_overflow);
+static void fifo_irq_tx_almost_full(void) {
+    hbc_data_write(0x96);
+}
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL), fifo_irq_tx_almost_full);
+
+static void fifo_irq_tx_overflow(void) {
+    hbc_data_write(0x97);
+}
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW), fifo_irq_tx_overflow);
 #endif
 
 void fifo_init(void) {
-//    ADD_INTERRUPT_HANDLER(IRQ_FIFO_OVERFLOW);
+#if 0
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW));
+#endif
 }
 
 void fifo_write(uint32_t data) {
     /* Block until write is available */
-    while (IRQ_FLAG_SET(IRQ_TX_FIFO_FULL));
+    while (IRQ_FLAG_SET(IRQ_TX_FIFO_ALMOST_FULL)) fifo_trigger();
     XIOModule_IoWriteWord(&io_mod, HEX(FIFO_ADDR), data);
 }
 
