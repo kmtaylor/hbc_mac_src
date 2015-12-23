@@ -4,6 +4,7 @@
 
 #include "gpio.h"
 #include "interrupt.h"
+#include "scrambler.h"
 #include "mem.h"
 
 #if USE_MEM
@@ -42,6 +43,38 @@ void mem_write(uint32_t data) {
 
 uint32_t mem_read(void) {
     return XIOModule_IoReadWord(&io_mod, HEX(MEM_RD_WR_ADDR));
+}
+
+uint8_t mem_test(uint32_t bytes) {
+    uint32_t i, mem, scram;
+    uint32_t errors = 0;
+    uint8_t flags;
+
+    flags = mem_get_flags();
+    mem_set_flags(0);
+    mem_set_wr_p(0);
+    scrambler_reseed(0);
+
+    for (i = 0; i < bytes/4; i++) {
+        mem_write(scrambler_read());
+    }
+    
+    mem_set_rd_p(0);
+    mem_set_wr_p(0);
+    scrambler_reseed(0);
+
+    for (i = 0; i < bytes/4; i++) {
+        mem = mem_read();
+        scram = scrambler_read();
+        if (mem != scram) errors++;
+    }
+    
+    mem_set_rd_p(0);
+    mem_set_wr_p(0);
+    scrambler_reseed(0);
+    mem_set_flags(flags);
+
+    return errors > 0xff ? 0xff : errors;
 }
 #else /* USE_MEM */
 static uint32_t val;

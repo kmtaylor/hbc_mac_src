@@ -1,8 +1,3 @@
-/* Bring up:
- * hbc_tx
- * hbc_rx
- */
-
 #include <stdint.h>
 #include <string.h>
 #include <xiomodule.h>
@@ -21,38 +16,14 @@
 #include "interrupt.h"
 #include "extract_rx.h"
 
-XIOModule io_mod;
-
 enum ctrl_state {
     CTRL_STATE_CMD,
     CTRL_STATE_REPLY,
 };
 
+XIOModule io_mod;
+
 static volatile int send_packet;
-
-static void mem_test(uint32_t bytes) {
-    uint32_t i, mem, scram;
-    uint32_t errors = 0;
-
-    mem_set_flags(0);
-    mem_set_wr_p(0);
-    scrambler_reseed(0);
-    for (i = 0; i < bytes/4; i++) {
-	mem_write(scrambler_read());
-    }
-    mem_set_rd_p(0);
-    mem_set_wr_p(0);
-    scrambler_reseed(0);
-    for (i = 0; i < bytes/4; i++) {
-	mem = mem_read();
-	scram = scrambler_read();
-	if (mem != scram) errors++;
-    }
-    hbc_data_write(errors > 0xff ? 0xff : errors);
-    mem_set_rd_p(0);
-    mem_set_wr_p(0);
-    scrambler_reseed(0);
-}
 
 static void ctrl_cmd(uint8_t cmd) {
     static enum ctrl_state state;
@@ -76,7 +47,8 @@ static void ctrl_cmd(uint8_t cmd) {
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_TEST_MEM:
-		    mem_test(256);
+		    data = mem_test(4096);
+		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_WRITE_FLASH:
 		    flash_write(0, FPGA_CONFIG_SIZE);
@@ -95,6 +67,29 @@ static void ctrl_cmd(uint8_t cmd) {
 		    bytes = 4;
 		    data = XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI));
 		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_RX_1:
+		    bytes = 4;
+		    data = rx_packet_ready();
+		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_RX_2:
+		    bytes = 4;
+		    data = rx_packet_length();
+		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_RX_3:
+		    bytes = 4;
+		    data = rx_check_crc_ok();
+		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_RX_4:
+		    bytes = 4;
+		    data = rx_read();
+		    state = CTRL_STATE_REPLY;
+		    break;
+		case CTRL_CMD_RX_5:
+		    rx_packet_next();
 		    break;
 	    }
 	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
@@ -116,18 +111,20 @@ static void ctrl_cmd(uint8_t cmd) {
 }
 
 int main() {
-
     XIOModule_Initialize(&io_mod, XPAR_IOMODULE_0_DEVICE_ID);
 
     fifo_init();
     mem_init();
-    hbc_spi_init(ctrl_cmd);
     flash_init();
     rx_init();
+    hbc_spi_init(ctrl_cmd);
+
+    /* Divide memory into RX and TX circular buffers */
+    mem_set_flags(MEM_READ_WRAP_16M | MEM_WRITE_WRAP_16M);
 
     setup_interrupts();
-    //ENABLE_INTERRUPT(INT(IRQ_RX_FIFO_FULL));
-    //ENABLE_INTERRUPT(INT(IRQ_RX_PKT_READY));
+    ENABLE_INTERRUPT(INT(IRQ_RX_FIFO_ALMOST_FULL));
+    ENABLE_INTERRUPT(INT(IRQ_RX_PKT_READY));
     ENABLE_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
 

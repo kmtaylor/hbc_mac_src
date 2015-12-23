@@ -21,7 +21,7 @@ extern void fifo_write_size(uint8_t size);
 
 #include "build_tx.h"
 
-static uint8_t crc8_update(uint8_t crc, uint8_t data) {
+uint8_t crc8_update(uint8_t crc, uint8_t data) {
     uint8_t i;
 
     crc = crc ^ data;
@@ -38,9 +38,9 @@ static uint8_t crc8_update(uint8_t crc, uint8_t data) {
 static uint8_t crc8(uint32_t header) {
     uint8_t crc = CRC8_INIT;
 
-    crc = crc8_update(crc, (header & 0xff));
-    crc = crc8_update(crc, ((header >> 8) & 0xff));
-    crc = crc8_update(crc, ((header >> 16) & 0xff));
+    crc = crc8_update(crc, header >> 0);
+    crc = crc8_update(crc, header >> 8);
+    crc = crc8_update(crc, header >> 16);
     
     return crc;
 }

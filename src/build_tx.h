@@ -11,6 +11,16 @@
 #define HDR_LEN_SHIFT	16
 #define HDR_CRC_SHIFT	24
 
+#define HDR_DR_MASK	0x00000007
+#define HDR_PI_MASK	0x00000038
+#define HDR_BM_MASK	0x00000100
+#define HDR_SS_MASK	0x00000800
+#define HDR_LEN_MASK	0x00ff0000
+#define HDR_CRC_MASK	0xff000000
+
+#define HDR_READ(hdr, member) \
+			((hdr & HDR_##member##_MASK) >> HDR_##member##_SHIFT)
+
 #define CRC8_POLY	0xB1	/* 10110001 = x^0 + x^2 + x^3 + x^7 + (x^8) */
 #define CRC8_INIT	0xFF
 
@@ -48,6 +58,8 @@ typedef struct {
 } plcp_header_t;
 
 typedef uint16_t walsh_t;
+
+extern uint8_t crc8_update(uint8_t crc, uint8_t data);
 
 extern void build_tx_plcp_header(plcp_header_t *header_info);
 extern void build_tx_payload(plcp_header_t *header_info);

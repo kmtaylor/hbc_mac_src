@@ -30,32 +30,6 @@ void fifo_write_size(uint8_t size) {
     XIOModule_IoWriteByte(&io_mod, HEX(FIFO_MASK_ADDR), size);
 }
 
-#if 0
-#include "spi.h"
-static void fifo_irq_tx_full(void) {
-    hbc_data_write(0x95);
-}
-DECLARE_HANDLER(INT(IRQ_TX_FIFO_FULL), fifo_irq_tx_full);
-
-static void fifo_irq_tx_almost_full(void) {
-    hbc_data_write(0x96);
-}
-DECLARE_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL), fifo_irq_tx_almost_full);
-
-static void fifo_irq_tx_overflow(void) {
-    hbc_data_write(0x97);
-}
-DECLARE_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW), fifo_irq_tx_overflow);
-#endif
-
-void fifo_init(void) {
-#if 0
-    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_FULL));
-    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL));
-    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW));
-#endif
-}
-
 void fifo_write(uint32_t data) {
     /* Block until write is available */
     while (IRQ_FLAG_SET(IRQ_TX_FIFO_ALMOST_FULL)) fifo_trigger();
@@ -74,4 +48,26 @@ void fifo_modulate_sf(uint8_t data) {
 
 uint32_t fifo_read(void) {
     return XIOModule_IoReadWord(&io_mod, HEX(RX_FIFO_ADDR));
+}
+
+#if FIFO_IRQ_DEBUG
+static void fifo_irq_tx_full(void) {
+}
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_FULL), fifo_irq_tx_full);
+
+static void fifo_irq_tx_almost_full(void) {
+}
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL), fifo_irq_tx_almost_full);
+
+static void fifo_irq_tx_overflow(void) {
+}
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW), fifo_irq_tx_overflow);
+#endif
+
+void fifo_init(void) {
+#if FIFO_IRQ_DEBUG
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW));
+#endif
 }
