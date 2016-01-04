@@ -47,7 +47,7 @@ static void ctrl_cmd(uint8_t cmd) {
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_TEST_MEM:
-		    data = mem_test(4096);
+		    data = mem_test(MEM_SIZE);
 		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_WRITE_FLASH:
@@ -91,6 +91,11 @@ static void ctrl_cmd(uint8_t cmd) {
 		case CTRL_CMD_RX_5:
 		    rx_packet_next();
 		    break;
+		case CTRL_CMD_RX_6:
+		    bytes = 4;
+		    data = rx_bytes_read();
+		    state = CTRL_STATE_REPLY;
+		    break;
 	    }
 	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
 	    break;
@@ -129,12 +134,12 @@ int main() {
     enable_interrupts();
 
     plcp_header_t header_info = {
-	.data_rate = r_sf_64,
+	.data_rate = r_sf_16,
         .pilot_info = pilot_none,
         .burst_mode = 0,
 	.use_ri = 1,
         .scrambler_seed = 0,
-        .PDSU_length = 255,
+        .PDSU_length = 128,
     };
 
     while (1) {
