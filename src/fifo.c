@@ -8,7 +8,6 @@
 #include "lcd.h"
 
 static int triggered;
-int fifo_writing;
 
 void fifo_trigger(void) {
     if (triggered) return;
@@ -24,6 +23,10 @@ void fifo_flush(void) {
 
 void fifo_reset(void) {
     triggered = 0;
+}
+
+void fifo_wait(void) {
+    while (!IRQ_FLAG_SET(IRQ_TX_FIFO_EMPTY)) {}
 }
 
 void fifo_write_size(uint8_t size) {
@@ -51,9 +54,9 @@ uint32_t fifo_read(void) {
 }
 
 #if FIFO_IRQ_DEBUG
-static void fifo_irq_tx_full(void) {
+static void fifo_irq_tx_empty(void) {
 }
-DECLARE_HANDLER(INT(IRQ_TX_FIFO_FULL), fifo_irq_tx_full);
+DECLARE_HANDLER(INT(IRQ_TX_FIFO_EMPTY), fifo_irq_tx_empty);
 
 static void fifo_irq_tx_almost_full(void) {
 }
@@ -66,7 +69,7 @@ DECLARE_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW), fifo_irq_tx_overflow);
 
 void fifo_init(void) {
 #if FIFO_IRQ_DEBUG
-    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_FULL));
+    ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_EMPTY));
     ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_ALMOST_FULL));
     ADD_INTERRUPT_HANDLER(INT(IRQ_TX_FIFO_OVERFLOW));
 #endif

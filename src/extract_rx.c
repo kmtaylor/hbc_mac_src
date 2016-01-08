@@ -48,7 +48,7 @@ uint8_t rx_packet_length(void) {
 }
 
 uint32_t rx_bytes_read(void) {
-    return rd_packet_marker;
+    return rd_packet_marker - 8;
 }
 
 int rx_check_crc_ok(void) {
@@ -69,10 +69,8 @@ uint32_t rx_read(void) {
 }
 
 void rx_packet_next(void) {
-    uint8_t bytes, words;
-
     /* 8 Extra bytes for packet marker and header */
-    rd_packet_addr += rx_bytes_read() + 8;
+    rd_packet_addr += rd_packet_marker;
 
     packet_ready--;
 }
@@ -83,8 +81,7 @@ static void rx_data_int_func(void) {
     static uint32_t val;
 
     mem_set_wr_p(wr_buf_addr);
-    if (rx_state == packet_init) {
-	wr_bytes = 0;
+    if ((rx_state == packet_init) && IRQ_FLAG_SET(IRQ_RX_DATA_READY)) {
 	wr_packet_addr = wr_buf_addr;
 	val = fifo_read();
 	/* Leave space for packet marker */
@@ -94,6 +91,7 @@ static void rx_data_int_func(void) {
 	inc_wr_buf();
 	scrambler_reseed(HDR_READ(val, SS));
 	rx_state = packet_reading;
+	wr_bytes += 8;
     }
 
     while (IRQ_FLAG_SET(IRQ_RX_DATA_READY)) {
@@ -112,23 +110,33 @@ static void rx_ready_int_func(void) {
 	rx_data_int_func();
     }
 
-    /* Write packet marker */ 
-    tmp = mem_get_wr_p();
-    mem_set_wr_p(wr_packet_addr);
-    mem_write(wr_bytes);
-    mem_set_wr_p(tmp);
+    if (wr_bytes) {
+	/* Write packet marker */ 
+	tmp = mem_get_wr_p();
+	mem_set_wr_p(wr_packet_addr);
+	mem_write(wr_bytes);
+	mem_set_wr_p(tmp);
 
-    rx_state = packet_init;
-    GPO_SET(HBC_RX_PKT_ACK);
-    GPO_CLEAR(HBC_RX_PKT_ACK);
-    packet_ready++;
+	rx_state = packet_init;
+	GPO_SET(HBC_RX_PKT_ACK);
+	GPO_CLEAR(HBC_RX_PKT_ACK);
+	packet_ready++;
+	wr_bytes = 0;
+    }
 }
 
 DECLARE_HANDLER(INT(IRQ_RX_FIFO_ALMOST_FULL), rx_data_int_func);
 DECLARE_HANDLER(INT(IRQ_RX_PKT_READY), rx_ready_int_func);
 
+void rx_enable(void) {
+    GPO_SET(HBC_RX_ENABLE);
+}
+
+void rx_disable(void) {
+    GPO_CLEAR(HBC_RX_ENABLE);
+}
+
 void rx_init(void) {
     ADD_INTERRUPT_HANDLER(INT(IRQ_RX_FIFO_ALMOST_FULL));
     ADD_INTERRUPT_HANDLER(INT(IRQ_RX_PKT_READY));
-    GPO_SET(HBC_RX_ENABLE);
 }

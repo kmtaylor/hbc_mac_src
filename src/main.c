@@ -25,6 +25,44 @@ XIOModule io_mod;
 
 static volatile int send_packet;
 
+static int rx_check_packet(void) {
+    int bytes, correct = 0;
+    uint32_t data, chk;
+
+    if (!rx_packet_ready()) return -1;
+
+    if (!rx_check_crc_ok()) goto discard_packet;
+	
+    bytes = rx_packet_length();
+	
+    if (rx_bytes_read() < bytes) goto discard_packet;
+
+    /* Ignore packet marker and header */
+    data = rx_read();
+    data = rx_read();
+
+    mem_set_rd_p(0);
+    chk = mem_read();
+    data = rx_read();
+    while (bytes) {
+	if ((chk & 0xff) == (data & 0xff)) correct++;
+	chk >>= 8;
+	data >>= 8;
+	bytes--;
+	if (bytes && ((bytes % 4) == 0)) {
+	    chk = mem_read();
+	    data = rx_read();
+	}
+    }
+
+    rx_packet_next();
+    return correct;
+
+discard_packet:
+    rx_packet_next();
+    return -1;
+}
+
 static void ctrl_cmd(uint8_t cmd) {
     static enum ctrl_state state;
     static uint8_t bytes;
@@ -89,11 +127,12 @@ static void ctrl_cmd(uint8_t cmd) {
 		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_5:
-		    rx_packet_next();
+		    data = rx_check_packet();
+		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_RX_6:
 		    bytes = 4;
-		    data = rx_bytes_read();
+		    data = rx_check_packet();
 		    state = CTRL_STATE_REPLY;
 		    break;
 	    }
@@ -133,17 +172,21 @@ int main() {
     ENABLE_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
     enable_interrupts();
 
+    GPO_SET(HBC_DATA_SWITCH);
+    rx_enable();
+
     plcp_header_t header_info = {
-	.data_rate = r_sf_16,
+	.data_rate = r_sf_8,
         .pilot_info = pilot_none,
         .burst_mode = 0,
 	.use_ri = 1,
         .scrambler_seed = 0,
-        .PDSU_length = 128,
+        .PDSU_length = 254,
     };
 
     while (1) {
 	if (send_packet) {
+
 	    mem_set_rd_p(0);
 
 	    disable_interrupts();

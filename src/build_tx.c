@@ -150,6 +150,8 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
     header_info->crc8 = crc8(header_bits);
     header_bits |= header_info->crc8		<< HDR_CRC_SHIFT;
 
+    fifo_wait();
+
     build_tx_preamble();
     build_tx_preamble();
     build_tx_preamble();
@@ -170,8 +172,6 @@ void build_tx_payload(plcp_header_t *header_info) {
     uint8_t num_words = header_info->PDSU_length / 4;
     if (header_info->PDSU_length % 4) num_words++;
 
-    fifo_writing = 1;
-
     fifo_set_rate(header_info->data_rate);
     scrambler_reseed(header_info->scrambler_seed);
     while (num_words) {
@@ -180,8 +180,6 @@ void build_tx_payload(plcp_header_t *header_info) {
 	fifo_modulate(data);
 	num_words--;
     }
-
-    fifo_writing = 0;
 
     fifo_flush();
     fifo_trigger();
