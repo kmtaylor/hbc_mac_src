@@ -19,6 +19,7 @@
 enum ctrl_state {
     CTRL_STATE_CMD,
     CTRL_STATE_REPLY,
+    CTRL_STATE_ACK,
 };
 
 XIOModule io_mod;
@@ -65,24 +66,22 @@ discard_packet:
 
 static void ctrl_cmd(uint8_t cmd) {
     static enum ctrl_state state;
-    static uint8_t bytes;
     static uint32_t data;
-    
-    if (cmd & 0x80) state = CTRL_STATE_CMD;
 
+    if (cmd == CTRL_CMD_START) {
+	hbc_ctrl_write(CTRL_STATUS_READY, 0);
+	state = CTRL_STATE_CMD;
+	return;
+    }
+    
     switch (state) {
 	case CTRL_STATE_CMD:
-	    hbc_ctrl_write(CTRL_STATUS_EMPTY << 8);
 	    switch (cmd) {
 		case CTRL_CMD_READ_SCRAMBLER:
-		    bytes = 4;
 		    data = scrambler_read();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_READ_MEM:
-		    bytes = 4;
 		    data = mem_read();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_TEST_MEM:
 		    data = mem_test(MEM_SIZE);
@@ -102,53 +101,46 @@ static void ctrl_cmd(uint8_t cmd) {
 		    send_packet = 1;
 		    break;
 		case CTRL_CMD_GET_IRQ:
-		    bytes = 4;
 		    data = XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI));
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_1:
-		    bytes = 4;
 		    data = rx_packet_ready();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_2:
-		    bytes = 4;
 		    data = rx_packet_length();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_3:
-		    bytes = 4;
 		    data = rx_check_crc_ok();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_4:
-		    bytes = 4;
 		    data = rx_read();
-		    state = CTRL_STATE_REPLY;
 		    break;
 		case CTRL_CMD_RX_5:
 		    data = rx_check_packet();
 		    hbc_data_write(data);
 		    break;
 		case CTRL_CMD_RX_6:
-		    bytes = 4;
 		    data = rx_check_packet();
-		    state = CTRL_STATE_REPLY;
 		    break;
 	    }
-	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE << 8);
+	    state = CTRL_STATE_REPLY;
+	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE, 0);
 	    break;
 	case CTRL_STATE_REPLY:
 	    switch (cmd) {
 		case CTRL_CMD_DATA_NEXT:
-		    if (bytes) {
-			hbc_ctrl_write((data >> 24) | (CTRL_STATUS_OK << 8));
-			data <<= 8;
-			bytes--;
-		    }
+		    hbc_ctrl_write(CTRL_STATUS_NEXT_DONE, data >> 24);
+		    data <<= 8;
+		    state = CTRL_STATE_ACK;
 		    break;
-		case CTRL_CMD_DATA:
-		    hbc_ctrl_write(CTRL_STATUS_EMPTY << 8);
+	    }
+	    break;
+	case CTRL_STATE_ACK:
+	    switch (cmd) {
+		case CTRL_CMD_DATA_ACK:
+		    hbc_ctrl_write(CTRL_STATUS_ACK_DONE, 0);
+		    state = CTRL_STATE_REPLY;
+		    break;
 	    }
 	    break;
     }
