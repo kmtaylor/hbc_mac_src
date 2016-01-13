@@ -77,49 +77,58 @@ static void ctrl_cmd(uint8_t cmd) {
     switch (state) {
 	case CTRL_STATE_CMD:
 	    switch (cmd) {
-		case CTRL_CMD_READ_SCRAMBLER:
-		    data = scrambler_read();
-		    break;
-		case CTRL_CMD_READ_MEM:
-		    data = mem_read();
-		    break;
-		case CTRL_CMD_TEST_MEM:
-		    data = mem_test(MEM_SIZE);
-		    hbc_data_write(data);
-		    break;
-		case CTRL_CMD_WRITE_FLASH:
-		    flash_write(0, FPGA_CONFIG_SIZE);
-		    data = flash_verify(0, FPGA_CONFIG_SIZE);
-		    hbc_data_write(data);
-		    break;
-		case CTRL_CMD_READ_FLASH:
-		    flash_read(0);
-		    mem_set_rd_p(0);
-		    hbc_data_write(CTRL_CMD_READ_FLASH);
-		    break;
-		case CTRL_CMD_HBC_TRIGGER:
-		    send_packet = 1;
-		    break;
-		case CTRL_CMD_GET_IRQ:
+		/* FPGA debug commands */
+		case CTRL_CMD_IRQ_STATUS_READ:
 		    data = XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI));
 		    break;
-		case CTRL_CMD_RX_1:
+		case CTRL_CMD_SCRAMBLER_READ:
+		    data = scrambler_read();
+		    break;
+
+		/* DRAM debug commands */
+		case CTRL_CMD_MEM_READ:
+		    data = mem_read();
+		    break;
+		case CTRL_CMD_MEM_TEST:
+		    data = mem_test(MEM_SIZE);
+		    break;
+
+		/* Flash debug commands */
+		case CTRL_CMD_FLASH_READ:
+		    flash_read(0);
+		    mem_set_rd_p(0);
+		    data = CTRL_CMD_FLASH_READ;
+		    break;
+		case CTRL_CMD_FLASH_WRITE:
+		    flash_write(0, FPGA_CONFIG_SIZE);
+		    data = flash_verify(0, FPGA_CONFIG_SIZE);
+		    break;
+
+		/* HBC_TX commands */
+		case CTRL_CMD_HBC_TX_TRIGGER:
+		    send_packet = 1;
+		    break;
+
+		/* HBC_RX commands */
+		case CTRL_CMD_HBC_RX_READY:
 		    data = rx_packet_ready();
 		    break;
-		case CTRL_CMD_RX_2:
+		case CTRL_CMD_HBC_RX_LENGTH:
 		    data = rx_packet_length();
 		    break;
-		case CTRL_CMD_RX_3:
+		case CTRL_CMD_HBC_RX_BYTES_READ:
+		    data = rx_bytes_read();
+		    break;
+		case CTRL_CMD_HBC_RX_CRC_OK:
 		    data = rx_check_crc_ok();
 		    break;
-		case CTRL_CMD_RX_4:
+		case CTRL_CMD_HBC_RX_READ:
 		    data = rx_read();
 		    break;
-		case CTRL_CMD_RX_5:
-		    data = rx_check_packet();
-		    hbc_data_write(data);
+		case CTRL_CMD_HBC_RX_NEXT:
+		    rx_packet_next();
 		    break;
-		case CTRL_CMD_RX_6:
+		case CTRL_CMD_HBC_RX_CHECK:
 		    data = rx_check_packet();
 		    break;
 	    }
