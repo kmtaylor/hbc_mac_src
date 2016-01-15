@@ -64,6 +64,7 @@ discard_packet:
     return -1;
 }
 
+/* Interrupt context - interrupts are disabled */
 static void ctrl_cmd(uint8_t cmd) {
     static enum ctrl_state state;
     static uint32_t data;
@@ -87,7 +88,15 @@ static void ctrl_cmd(uint8_t cmd) {
 
 		/* DRAM debug commands */
 		case CTRL_CMD_MEM_READ:
-		    data = mem_read();
+		    //data = mem_read();
+		    //FIXME
+		    data = hbc_test();
+		    break;
+		case CTRL_CMD_MEM_RD_ADDR:
+		    hbc_data_mem_read_addr_helper();
+		    break;
+		case CTRL_CMD_MEM_DUMP:
+		    hbc_data_write_from_mem_enable(1);
 		    break;
 		case CTRL_CMD_MEM_TEST:
 		    data = mem_test(MEM_SIZE);
@@ -171,6 +180,7 @@ int main() {
     ENABLE_INTERRUPT(INT(IRQ_RX_FIFO_ALMOST_FULL));
     ENABLE_INTERRUPT(INT(IRQ_RX_PKT_READY));
     ENABLE_INTERRUPT(INT(IRQ_HBC_CTRL_SPI));
+    ENABLE_INTERRUPT(INT(IRQ_HBC_DATA_SPI));
     enable_interrupts();
 
     GPO_SET(HBC_DATA_SWITCH);
@@ -188,9 +198,8 @@ int main() {
     while (1) {
 	if (send_packet) {
 
-	    mem_set_rd_p(0);
-
 	    disable_interrupts();
+	    mem_set_rd_p(0);
 	    build_tx_plcp_header(&header_info);
 	    build_tx_payload(&header_info);
 	    enable_interrupts();
