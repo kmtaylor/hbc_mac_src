@@ -88,15 +88,23 @@ static void ctrl_cmd(uint8_t cmd) {
 
 		/* DRAM debug commands */
 		case CTRL_CMD_MEM_READ:
-		    //data = mem_read();
-		    //FIXME
-		    data = hbc_test();
+		    data = mem_read();
 		    break;
 		case CTRL_CMD_MEM_RD_ADDR:
 		    hbc_data_mem_read_addr_helper();
 		    break;
+		case CTRL_CMD_MEM_WR_ADDR:
+		    hbc_data_mem_write_addr_helper();
+		    break;
 		case CTRL_CMD_MEM_DUMP:
 		    hbc_data_write_from_mem_enable(1);
+		    break;
+		case CTRL_CMD_MEM_LOAD:
+		    hbc_data_read_to_mem_enable(1);
+		    break;
+		case CTRL_CMD_MEM_OP_DONE:
+		    hbc_data_write_from_mem_enable(0);
+		    hbc_data_read_to_mem_enable(0);
 		    break;
 		case CTRL_CMD_MEM_TEST:
 		    data = mem_test(MEM_SIZE);

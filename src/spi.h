@@ -11,5 +11,4 @@ extern void hbc_data_read_to_mem_enable(int enable);
 extern void hbc_data_write_from_mem_enable(int enable);
 
 extern void hbc_data_mem_read_addr_helper(void);
-
-extern uint32_t hbc_test(void); //FIXME
+extern void hbc_data_mem_write_addr_helper(void);
