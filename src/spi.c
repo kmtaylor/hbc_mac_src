@@ -50,12 +50,20 @@ uint8_t hbc_data_read(void) {
 /* Writes must be padded for 32 bit alignement */
 static void hbc_data_irq(void) {
     static uint32_t rd_data, wr_data;
+    int req_next = 0;
 
+    if (data_status.reading_arg) {
+	if (data_status.arg_callback)
+	    data_status.arg_callback(hbc_data_read());
+
+	req_next = 1;
+    }
+    
     if (data_status.reading_mem) {
 	rd_data |= (hbc_data_read() << (data_status.rd_index * 8));
 	data_status.rd_index++;
 
-	data_req_next();
+	req_next = 1;
 
 	if (data_status.rd_index == 4) {
 	    mem_set_wr_p(data_status.read_addr);
@@ -66,13 +74,6 @@ static void hbc_data_irq(void) {
 	}
     }
 
-    if (data_status.reading_arg) {
-	if (data_status.arg_callback)
-	    data_status.arg_callback(hbc_data_read());
-
-	data_req_next();
-    }
-    
     if (data_status.writing) {
 	if (data_status.wr_index == 0) {
 	    mem_set_rd_p(data_status.write_addr);
@@ -82,13 +83,15 @@ static void hbc_data_irq(void) {
 	hbc_data_write(wr_data >> data_status.wr_index * 8);
 	data_status.wr_index++;
 
-	data_req_next();
+	req_next = 1;
 
 	if (data_status.wr_index == 4) {
 	    data_status.write_addr += data_status.wr_index;
 	    data_status.wr_index = 0;
 	}
     }
+
+    if (req_next) data_req_next();
 }
 DECLARE_HANDLER(INT(IRQ_HBC_DATA_SPI), hbc_data_irq);
 
@@ -103,7 +106,6 @@ void hbc_spi_init(void (*fn)(uint8_t)) {
 void hbc_data_arg_enable(void (*callback)(uint8_t arg), int enable) {
     data_status.reading_arg = enable;
     data_status.arg_callback = callback;
-    data_req_next();
 }
 
 void hbc_data_read_to_mem_enable(int enable) {
@@ -115,7 +117,7 @@ void hbc_data_write_from_mem_enable(int enable) {
     data_status.writing = enable;
     data_status.wr_index = 0;
     /* Load up first byte */
-    hbc_data_irq();
+    if (enable) hbc_data_irq();
 }
 
 static void rd_addr_load(uint8_t arg) {
@@ -145,9 +147,11 @@ static void wr_addr_load(uint8_t arg) {
 void hbc_data_mem_read_addr_helper(void) {
     data_status.write_addr = 0;
     hbc_data_arg_enable(rd_addr_load, 1);
+    data_req_next();
 }
 
 void hbc_data_mem_write_addr_helper(void) {
     data_status.read_addr = 0;
     hbc_data_arg_enable(wr_addr_load, 1);
+    data_req_next();
 }

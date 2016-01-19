@@ -102,8 +102,10 @@ static void ctrl_cmd(uint8_t cmd) {
 		case CTRL_CMD_MEM_LOAD:
 		    hbc_data_read_to_mem_enable(1);
 		    break;
-		case CTRL_CMD_MEM_OP_DONE:
+		case CTRL_CMD_MEM_DUMP_DONE:
 		    hbc_data_write_from_mem_enable(0);
+		    break;
+		case CTRL_CMD_MEM_LOAD_DONE:
 		    hbc_data_read_to_mem_enable(0);
 		    break;
 		case CTRL_CMD_MEM_TEST:
