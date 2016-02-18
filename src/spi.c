@@ -15,6 +15,7 @@ static struct {
     int writing:1;
     int rd_index;
     int wr_index;
+    int arg_index;
     void (*arg_callback)(uint8_t arg);
 } data_status;
 
@@ -26,8 +27,8 @@ static void hbc_ctrl_irq(void) {
 DECLARE_HANDLER(INT(IRQ_HBC_CTRL_SPI), hbc_ctrl_irq);
 
 static inline void data_req_next(void) {
-    GPO_IN(HBC_DATA_INT);
-    GPO_OUT(HBC_DATA_INT);
+    GPO_SET(HBC_DATA_INT);
+    GPO_CLEAR(HBC_DATA_INT);
 }
 
 void hbc_ctrl_write(uint8_t status, uint8_t data) {
@@ -109,11 +110,15 @@ void hbc_data_arg_enable(void (*callback)(uint8_t arg), int enable) {
 }
 
 void hbc_data_read_to_mem_enable(int enable) {
+    if (enable) GPO_CLEAR(LED_1BIT);
+    else GPO_SET(LED_1BIT);
     data_status.reading_mem = enable;
     data_status.rd_index = 0;
 }
 
 void hbc_data_write_from_mem_enable(int enable) {
+    if (enable) GPO_CLEAR(LED_1BIT);
+    else GPO_SET(LED_1BIT);
     data_status.writing = enable;
     data_status.wr_index = 0;
     /* Load up first byte */
@@ -121,37 +126,33 @@ void hbc_data_write_from_mem_enable(int enable) {
 }
 
 static void rd_addr_load(uint8_t arg) {
-    static int index;
+    data_status.write_addr |= (arg << data_status.arg_index * 8);
+    data_status.arg_index--;
 
-    data_status.write_addr |= (arg << index * 8);
-    index++;
-
-    if (index == 4) {
+    if (data_status.arg_index == -1) {
 	hbc_data_arg_enable(NULL, 0);
-	index = 0;
     }
 }
 
 static void wr_addr_load(uint8_t arg) {
-    static int index;
+    data_status.read_addr |= (arg << data_status.arg_index * 8);
+    data_status.arg_index--;
 
-    data_status.read_addr |= (arg << index * 8);
-    index++;
-
-    if (index == 4) {
+    if (data_status.arg_index == -1) {
 	hbc_data_arg_enable(NULL, 0);
-	index = 0;
     }
 }
 
 void hbc_data_mem_read_addr_helper(void) {
     data_status.write_addr = 0;
+    data_status.arg_index = 3;
     hbc_data_arg_enable(rd_addr_load, 1);
     data_req_next();
 }
 
 void hbc_data_mem_write_addr_helper(void) {
     data_status.read_addr = 0;
+    data_status.arg_index = 3;
     hbc_data_arg_enable(wr_addr_load, 1);
     data_req_next();
 }

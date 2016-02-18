@@ -1,10 +1,36 @@
 /* M25P40 4MB Flash device
- * 512Kb = (8 * 64Kb sectors) = (2048 * 256b pages)
+ * 512KB = (8 * 64KB sectors) = (2048 * 256B pages)
  * Maximum address: 0x7ffff
+ * FPGA configuration data occupies:
+ * 0x00000 to 0x5327B
+ *
+ * There is 183684 bytes remaining. Enough to store the PSoC flash.
+ * 
+ * Memory map:
+ *
+ * Start addr	End addr    Size    Purpose
+ *
+ * 0x00000	0x5327B	    340604  FPGA configuration
+ * 0x60000	0x60003	    4	    PSOC JTAG ID
+ * 0x60004	0x60005	    2	    PSOC Image checksum
+ * 0x60008	0x6000B	    4	    PSOC NVL (non-volatile latch)
+ * 0x6000C	0x6000F	    4	    PSOC WOL (write once NV latch)
+ * 0x60010	0x6002F	    32	    PSOC Flash protection data
+ * 0x60030	0x6902F	    36864   PSOC Flash data
  */
 
 #define FLASH_SIZE		    (512 * 1024)
 #define PAGE_SIZE		    256
+
+#define FLASH_ADDR_FPGA_CONF	    0x00000
+#define FLASH_ADDR_PSOC_CONF	    0x60000
+
+#define FLASH_ADDR_PSOC_JTAG	    FLASH_ADDR_PSOC_CONF
+#define FLASH_ADDR_PSOC_CHKSUM	    (FLASH_ADDR_PSOC_CONF + 0x04)
+#define FLASH_ADDR_PSOC_NVL	    (FLASH_ADDR_PSOC_CONF + 0x08)
+#define FLASH_ADDR_PSOC_WOL	    (FLASH_ADDR_PSOC_CONF + 0x0C)
+#define FLASH_ADDR_PSOC_PROTECT	    (FLASH_ADDR_PSOC_CONF + 0x10)
+#define FLASH_ADDR_PSOC_FLASH	    (FLASH_ADDR_PSOC_CONF + 0x30)
 
 #define FPGA_CONFIG_SIZE	    340604
 

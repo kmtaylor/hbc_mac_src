@@ -88,6 +88,7 @@ static void ctrl_cmd(uint8_t cmd) {
 
 		/* DRAM debug commands */
 		case CTRL_CMD_MEM_READ:
+		    mem_set_rd_p(0);
 		    data = mem_read();
 		    break;
 		case CTRL_CMD_MEM_RD_ADDR:
@@ -195,6 +196,8 @@ int main() {
 
     GPO_SET(HBC_DATA_SWITCH);
     rx_enable();
+
+    GPO_SET(LED_1BIT);
 
     plcp_header_t header_info = {
 	.data_rate = r_sf_8,
