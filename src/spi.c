@@ -122,7 +122,7 @@ void hbc_spi_reply(uint32_t data, int size) {
     data_status.reply_data = data;
 }
 
-void hbc_spi_reply_trigger(void) {
+void hbc_spi_data_trigger(void) {
     hbc_data_irq();
 }
 
@@ -137,7 +137,6 @@ void hbc_spi_load_addr(uint32_t addr) {
 void hbc_spi_dump_bytes(uint32_t bytes) {
     data_status.dump_index = 0;
     data_status.dumping_mem = bytes;
-    hbc_data_irq();
 }
 
 void hbc_spi_load_bytes(uint32_t bytes) {

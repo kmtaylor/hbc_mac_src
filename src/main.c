@@ -97,93 +97,81 @@ static void ctrl_cmd(uint8_t c) {
     hbc_spi_ack(HBC_ACK);
 
     switch(pkt[PACKET_CMD_OFFSET]) {
-	case SCRAMBLER_READ:
-	    GPO_CLEAR(LED_1BIT);
-	    hbc_spi_reply(scrambler_read(), 4);
-	    break;
-    }
-
-    hbc_spi_reply_trigger();
-
-#if 0
-    switch (cmd) {
 	/* FPGA debug commands */
-	case CTRL_CMD_IRQ_STATUS_READ:
+	case CMD_IRQ_STATUS_READ:
 	    hbc_spi_reply(XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI)), 4);
 	    break;
-	case CTRL_CMD_SCRAMBLER_READ:
+	case CMD_SCRAMBLER_READ:
 	    hbc_spi_reply(scrambler_read(), 4);
 	    break;
 
 	/* DRAM debug commands */
-	case CTRL_CMD_MEM_READ:
+	case CMD_MEM_READ:
 	    mem_set_rd_p(0);
 	    hbc_spi_reply(mem_read(), 4);
 	    break;
-	case CTRL_CMD_MEM_RD_ADDR:
-	    CHECK_ARG;
-	    hbc_spi_dump_addr(buf_to_word(cmd_arg));
-	    CLEAR_ARG;
+	case CMD_MEM_RD_ADDR:
+	    hbc_spi_dump_addr(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
 	    break;
-	case CTRL_CMD_MEM_WR_ADDR:
-	    CHECK_ARG;
-	    hbc_spi_load_addr(buf_to_word(cmd_arg));
-	    CLEAR_ARG;
+	case CMD_MEM_WR_ADDR:
+	    hbc_spi_load_addr(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
 	    break;
-	case CTRL_CMD_MEM_DUMP:
-	    CHECK_ARG;
-	    hbc_spi_dump_bytes(buf_to_word(cmd_arg));
-	    CLEAR_ARG;
+	case CMD_MEM_DUMP:
+	    hbc_spi_dump_bytes(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
 	    break;
-	case CTRL_CMD_MEM_LOAD:
-	    CHECK_ARG;
-	    hbc_spi_load_bytes(buf_to_word(cmd_arg));
-	    CLEAR_ARG;
+	case CMD_MEM_LOAD:
+	    hbc_spi_load_bytes(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
 	    break;
-	case CTRL_CMD_MEM_TEST:
+	case CMD_MEM_TEST:
 	    hbc_spi_reply(mem_test(MEM_SIZE), 4);
 	    break;
 
 	/* Flash debug commands */
-	case CTRL_CMD_FLASH_READ:
+	case CMD_FLASH_READ:
 	    flash_read(0);
 	    mem_set_rd_p(0);
-	    hbc_spi_reply(CTRL_CMD_FLASH_READ, 4);
+	    hbc_spi_reply(CMD_FLASH_READ, 4);
 	    break;
-	case CTRL_CMD_FLASH_WRITE:
+	case CMD_FLASH_WRITE:
 	    flash_write(0, FPGA_CONFIG_SIZE);
 	    hbc_spi_reply(flash_verify(0, FPGA_CONFIG_SIZE), 4);
 	    break;
 
 	/* HBC_TX commands */
-	case CTRL_CMD_HBC_TX_TRIGGER:
+	case CMD_HBC_TX_TRIGGER:
 	    send_packet = 1;
 	    break;
 
 	/* HBC_RX commands */
-	case CTRL_CMD_HBC_RX_READY:
+	case CMD_HBC_RX_READY:
 	    hbc_spi_reply(rx_packet_ready(), 4);
 	    break;
-	case CTRL_CMD_HBC_RX_LENGTH:
+	case CMD_HBC_RX_LENGTH:
 	    hbc_spi_reply(rx_packet_length(), 4);
 	    break;
-	case CTRL_CMD_HBC_RX_BYTES_READ:
+	case CMD_HBC_RX_BYTES_READ:
 	    hbc_spi_reply(rx_bytes_read(), 4);
 	    break;
-	case CTRL_CMD_HBC_RX_CRC_OK:
+	case CMD_HBC_RX_CRC_OK:
 	    hbc_spi_reply(rx_check_crc_ok(), 4);
 	    break;
-	case CTRL_CMD_HBC_RX_READ:
+	case CMD_HBC_RX_READ:
 	    hbc_spi_reply(rx_read(), 4);
 	    break;
-	case CTRL_CMD_HBC_RX_NEXT:
+	case CMD_HBC_RX_NEXT:
 	    rx_packet_next();
 	    break;
-	case CTRL_CMD_HBC_RX_CHECK:
+	case CMD_HBC_RX_CHECK:
 	    hbc_spi_reply(rx_check_packet(), 4);
 	    break;
+
+	default:
+	    /* If pass through is enabled, pretend that we are the PSOC */
+	    hbc_spi_ack(PSOC_ACK);
+	    break;
     }
-#endif
+
+    hbc_spi_data_trigger();
 }
 
 int main() {
