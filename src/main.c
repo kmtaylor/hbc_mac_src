@@ -8,7 +8,7 @@
 #include "fifo.h"
 #include "usb.h"
 #include "spi.h"
-#include "spi_protocol.h"
+#include "host_protocol.h"
 #include "flash.h"
 #include "mem.h"
 #include "build_tx.h"
@@ -68,25 +68,44 @@ static uint32_t buf_to_word(uint8_t *buf) {
     return buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
 }
 
-#define CHECK_ARG \
-    if (arg_size < 4) {							    \
-	arg_required = 4 - arg_size;					    \
-	return;								    \
-    }
-#define CLEAR_ARG arg_size = 0;
 /* Interrupt context - interrupts are disabled */
 static void ctrl_cmd(uint8_t c) {
-    static uint8_t cmd_arg[4];
-    static uint8_t cmd, arg_size, arg_required;
+    static uint8_t pkt[PACKET_SIZE];
+    static uint8_t bytes_req;
+    uint8_t crc;
+    int i;
 
-    if (!arg_required) {
-	cmd = c;
-    } else {
-	cmd_arg[arg_size] = c;
-	arg_size++;
-	arg_required--;
+    if (!bytes_req) {
+	if (c == PACKET_HEADER) bytes_req = PACKET_SIZE;
+        return;
     }
 
+    pkt[PACKET_SIZE - bytes_req] = c;
+    bytes_req--;
+
+    /* Packet not finished yet */
+    if (bytes_req) return;
+
+    /* Check for CRC error */
+    crc = CRC8_INIT;
+    for (i = 0; i < PACKET_SIZE; i++) {
+        crc = crc8_update(crc, pkt[i]);
+    }
+    if (crc) return;
+
+    /* Acknowledge successful packet */
+    hbc_spi_ack(HBC_ACK);
+
+    switch(pkt[PACKET_CMD_OFFSET]) {
+	case SCRAMBLER_READ:
+	    GPO_CLEAR(LED_1BIT);
+	    hbc_spi_reply(scrambler_read(), 4);
+	    break;
+    }
+
+    hbc_spi_reply_trigger();
+
+#if 0
     switch (cmd) {
 	/* FPGA debug commands */
 	case CTRL_CMD_IRQ_STATUS_READ:
@@ -164,6 +183,7 @@ static void ctrl_cmd(uint8_t c) {
 	    hbc_spi_reply(rx_check_packet(), 4);
 	    break;
     }
+#endif
 }
 
 int main() {

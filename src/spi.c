@@ -16,7 +16,9 @@ static struct {
     uint32_t dumping_mem;
     int load_index;
     int dump_index;
+    int reply_ack;
     int reply_bytes;
+    int reply_size;
     uint32_t reply_data;
 } data_status;
 
@@ -77,10 +79,16 @@ DECLARE_HANDLER(INT(IRQ_HBC_CTRL_SPI), hbc_ctrl_irq);
 static void hbc_data_irq(void) {
     static uint32_t wr_data;
 
-    if (data_status.reply_bytes) {
+    if (data_status.reply_ack) {
+
+	hbc_data_write(data_status.reply_ack);
+	data_status.reply_ack = 0;
+	data_req_next();
+
+    } else if (data_status.reply_bytes) {
 
 	hbc_data_write(data_status.reply_data >> 
-			((4 - data_status.reply_bytes) * 8));
+		    ((data_status.reply_size - data_status.reply_bytes) * 8));
 	data_status.reply_bytes--;
 	data_req_next();
 
@@ -104,9 +112,17 @@ static void hbc_data_irq(void) {
 }
 DECLARE_HANDLER(INT(IRQ_HBC_DATA_SPI), hbc_data_irq);
 
+void hbc_spi_ack(uint8_t ack_cmd) {
+    data_status.reply_ack = ack_cmd;
+}
+
 void hbc_spi_reply(uint32_t data, int size) {
     data_status.reply_bytes = size;
+    data_status.reply_size = size;
     data_status.reply_data = data;
+}
+
+void hbc_spi_reply_trigger(void) {
     hbc_data_irq();
 }
 
