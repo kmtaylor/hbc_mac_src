@@ -64,113 +64,104 @@ discard_packet:
     return -1;
 }
 
-/* Interrupt context - interrupts are disabled */
-static void ctrl_cmd(uint8_t cmd) {
-    static enum ctrl_state state;
-    static uint32_t data;
+static uint32_t buf_to_word(uint8_t *buf) {
+    return buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+}
 
-    if (cmd == CTRL_CMD_START) {
-	hbc_ctrl_write(CTRL_STATUS_READY, 0);
-	state = CTRL_STATE_CMD;
-	return;
+#define CHECK_ARG \
+    if (arg_size < 4) {							    \
+	arg_required = 4 - arg_size;					    \
+	return;								    \
     }
-    
-    switch (state) {
-	case CTRL_STATE_CMD:
-	    switch (cmd) {
-		/* FPGA debug commands */
-		case CTRL_CMD_IRQ_STATUS_READ:
-		    data = XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI));
-		    break;
-		case CTRL_CMD_SCRAMBLER_READ:
-		    data = scrambler_read();
-		    break;
+#define CLEAR_ARG arg_size = 0;
+/* Interrupt context - interrupts are disabled */
+static void ctrl_cmd(uint8_t c) {
+    static uint8_t cmd_arg[4];
+    static uint8_t cmd, arg_size, arg_required;
 
-		/* DRAM debug commands */
-		case CTRL_CMD_MEM_READ:
-		    mem_set_rd_p(0);
-		    data = mem_read();
-		    break;
-		case CTRL_CMD_MEM_RD_ADDR:
-		    hbc_data_mem_read_addr_helper();
-		    break;
-		case CTRL_CMD_MEM_WR_ADDR:
-		    hbc_data_mem_write_addr_helper();
-		    break;
-		case CTRL_CMD_MEM_DUMP:
-		    hbc_data_write_from_mem_enable(1);
-		    break;
-		case CTRL_CMD_MEM_LOAD:
-		    hbc_data_read_to_mem_enable(1);
-		    break;
-		case CTRL_CMD_MEM_DUMP_DONE:
-		    hbc_data_write_from_mem_enable(0);
-		    break;
-		case CTRL_CMD_MEM_LOAD_DONE:
-		    hbc_data_read_to_mem_enable(0);
-		    break;
-		case CTRL_CMD_MEM_TEST:
-		    data = mem_test(MEM_SIZE);
-		    break;
+    if (!arg_required) {
+	cmd = c;
+    } else {
+	cmd_arg[arg_size] = c;
+	arg_size++;
+	arg_required--;
+    }
 
-		/* Flash debug commands */
-		case CTRL_CMD_FLASH_READ:
-		    flash_read(0);
-		    mem_set_rd_p(0);
-		    data = CTRL_CMD_FLASH_READ;
-		    break;
-		case CTRL_CMD_FLASH_WRITE:
-		    flash_write(0, FPGA_CONFIG_SIZE);
-		    data = flash_verify(0, FPGA_CONFIG_SIZE);
-		    break;
-
-		/* HBC_TX commands */
-		case CTRL_CMD_HBC_TX_TRIGGER:
-		    send_packet = 1;
-		    break;
-
-		/* HBC_RX commands */
-		case CTRL_CMD_HBC_RX_READY:
-		    data = rx_packet_ready();
-		    break;
-		case CTRL_CMD_HBC_RX_LENGTH:
-		    data = rx_packet_length();
-		    break;
-		case CTRL_CMD_HBC_RX_BYTES_READ:
-		    data = rx_bytes_read();
-		    break;
-		case CTRL_CMD_HBC_RX_CRC_OK:
-		    data = rx_check_crc_ok();
-		    break;
-		case CTRL_CMD_HBC_RX_READ:
-		    data = rx_read();
-		    break;
-		case CTRL_CMD_HBC_RX_NEXT:
-		    rx_packet_next();
-		    break;
-		case CTRL_CMD_HBC_RX_CHECK:
-		    data = rx_check_packet();
-		    break;
-	    }
-	    state = CTRL_STATE_REPLY;
-	    hbc_ctrl_write(CTRL_STATUS_CMD_DONE, 0);
+    switch (cmd) {
+	/* FPGA debug commands */
+	case CTRL_CMD_IRQ_STATUS_READ:
+	    hbc_spi_reply(XIOModule_DiscreteRead(&io_mod, INT(IRQ_GPI)), 4);
 	    break;
-	case CTRL_STATE_REPLY:
-	    switch (cmd) {
-		case CTRL_CMD_DATA_NEXT:
-		    hbc_ctrl_write(CTRL_STATUS_NEXT_DONE, data >> 24);
-		    data <<= 8;
-		    state = CTRL_STATE_ACK;
-		    break;
-	    }
+	case CTRL_CMD_SCRAMBLER_READ:
+	    hbc_spi_reply(scrambler_read(), 4);
 	    break;
-	case CTRL_STATE_ACK:
-	    switch (cmd) {
-		case CTRL_CMD_DATA_ACK:
-		    hbc_ctrl_write(CTRL_STATUS_ACK_DONE, 0);
-		    state = CTRL_STATE_REPLY;
-		    break;
-	    }
+
+	/* DRAM debug commands */
+	case CTRL_CMD_MEM_READ:
+	    mem_set_rd_p(0);
+	    hbc_spi_reply(mem_read(), 4);
+	    break;
+	case CTRL_CMD_MEM_RD_ADDR:
+	    CHECK_ARG;
+	    hbc_spi_dump_addr(buf_to_word(cmd_arg));
+	    CLEAR_ARG;
+	    break;
+	case CTRL_CMD_MEM_WR_ADDR:
+	    CHECK_ARG;
+	    hbc_spi_load_addr(buf_to_word(cmd_arg));
+	    CLEAR_ARG;
+	    break;
+	case CTRL_CMD_MEM_DUMP:
+	    CHECK_ARG;
+	    hbc_spi_dump_bytes(buf_to_word(cmd_arg));
+	    CLEAR_ARG;
+	    break;
+	case CTRL_CMD_MEM_LOAD:
+	    CHECK_ARG;
+	    hbc_spi_load_bytes(buf_to_word(cmd_arg));
+	    CLEAR_ARG;
+	    break;
+	case CTRL_CMD_MEM_TEST:
+	    hbc_spi_reply(mem_test(MEM_SIZE), 4);
+	    break;
+
+	/* Flash debug commands */
+	case CTRL_CMD_FLASH_READ:
+	    flash_read(0);
+	    mem_set_rd_p(0);
+	    hbc_spi_reply(CTRL_CMD_FLASH_READ, 4);
+	    break;
+	case CTRL_CMD_FLASH_WRITE:
+	    flash_write(0, FPGA_CONFIG_SIZE);
+	    hbc_spi_reply(flash_verify(0, FPGA_CONFIG_SIZE), 4);
+	    break;
+
+	/* HBC_TX commands */
+	case CTRL_CMD_HBC_TX_TRIGGER:
+	    send_packet = 1;
+	    break;
+
+	/* HBC_RX commands */
+	case CTRL_CMD_HBC_RX_READY:
+	    hbc_spi_reply(rx_packet_ready(), 4);
+	    break;
+	case CTRL_CMD_HBC_RX_LENGTH:
+	    hbc_spi_reply(rx_packet_length(), 4);
+	    break;
+	case CTRL_CMD_HBC_RX_BYTES_READ:
+	    hbc_spi_reply(rx_bytes_read(), 4);
+	    break;
+	case CTRL_CMD_HBC_RX_CRC_OK:
+	    hbc_spi_reply(rx_check_crc_ok(), 4);
+	    break;
+	case CTRL_CMD_HBC_RX_READ:
+	    hbc_spi_reply(rx_read(), 4);
+	    break;
+	case CTRL_CMD_HBC_RX_NEXT:
+	    rx_packet_next();
+	    break;
+	case CTRL_CMD_HBC_RX_CHECK:
+	    hbc_spi_reply(rx_check_packet(), 4);
 	    break;
     }
 }

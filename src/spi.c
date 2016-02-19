@@ -7,29 +7,18 @@
 #include "interrupt.h"
 #include "mem.h"
 
-static struct {
-    uint32_t write_addr;
-    uint32_t read_addr;
-    int reading_mem:1;
-    int reading_arg:1;
-    int writing:1;
-    int rd_index;
-    int wr_index;
-    int arg_index;
-    void (*arg_callback)(uint8_t arg);
-} data_status;
-
 static void (*irq)(uint8_t cmd);
 
-static void hbc_ctrl_irq(void) {
-    irq(hbc_ctrl_read());
-}
-DECLARE_HANDLER(INT(IRQ_HBC_CTRL_SPI), hbc_ctrl_irq);
-
-static inline void data_req_next(void) {
-    GPO_SET(HBC_DATA_INT);
-    GPO_CLEAR(HBC_DATA_INT);
-}
+static struct {
+    uint32_t load_addr;
+    uint32_t dump_addr;
+    uint32_t loading_mem;
+    uint32_t dumping_mem;
+    int load_index;
+    int dump_index;
+    int reply_bytes;
+    uint32_t reply_data;
+} data_status;
 
 void hbc_ctrl_write(uint8_t status, uint8_t data) {
     XIOModule_IoWriteHalfword(&io_mod, HEX(SPI_CTRL_ADDR),
@@ -48,53 +37,97 @@ uint8_t hbc_data_read(void) {
     return XIOModule_IoReadByte(&io_mod, HEX(SPI_DATA_ADDR));
 }
 
+static void data_req_next(void) {
+    GPO_SET(HBC_DATA_INT);
+    GPO_CLEAR(HBC_DATA_INT);
+}
+
+static void ctrl_req_next(void) {
+    GPO_SET(HBC_CTRL_INT);
+    GPO_CLEAR(HBC_CTRL_INT);
+}
+
+/* ------- Interrupt routines ------------------------------------------ */
 /* Writes must be padded for 32 bit alignement */
-static void hbc_data_irq(void) {
-    static uint32_t rd_data, wr_data;
-    int req_next = 0;
+static void hbc_ctrl_irq(void) {
+    static uint32_t rd_data;
+    uint8_t byte;
 
-    if (data_status.reading_arg) {
-	if (data_status.arg_callback)
-	    data_status.arg_callback(hbc_data_read());
+    byte = hbc_ctrl_read();
 
-	req_next = 1;
-    }
-    
-    if (data_status.reading_mem) {
-	rd_data |= (hbc_data_read() << (data_status.rd_index * 8));
-	data_status.rd_index++;
+    if (data_status.loading_mem) {
+	rd_data |= (byte << (data_status.load_index * 8));
+	data_status.load_index++;
+	data_status.loading_mem--;
 
-	req_next = 1;
-
-	if (data_status.rd_index == 4) {
-	    mem_set_wr_p(data_status.read_addr);
+	if (data_status.load_index == 4) {
+	    mem_set_wr_p(data_status.load_addr);
 	    mem_write(rd_data);
-	    data_status.read_addr += data_status.rd_index;
-	    data_status.rd_index = 0;
+	    data_status.load_addr += data_status.load_index;
+	    data_status.load_index = 0;
 	    rd_data = 0;
 	}
-    }
+    } else irq(byte);
 
-    if (data_status.writing) {
-	if (data_status.wr_index == 0) {
-	    mem_set_rd_p(data_status.write_addr);
+    /* Acknowledge PSOC */
+    ctrl_req_next();
+}
+DECLARE_HANDLER(INT(IRQ_HBC_CTRL_SPI), hbc_ctrl_irq);
+
+static void hbc_data_irq(void) {
+    static uint32_t wr_data;
+
+    if (data_status.reply_bytes) {
+
+	hbc_data_write(data_status.reply_data >> 
+			((4 - data_status.reply_bytes) * 8));
+	data_status.reply_bytes--;
+	data_req_next();
+
+    } else if (data_status.dumping_mem) {
+	if (data_status.dump_index == 0) {
+	    mem_set_rd_p(data_status.dump_addr);
 	    wr_data = mem_read();
 	}
 	    
-	hbc_data_write(wr_data >> data_status.wr_index * 8);
-	data_status.wr_index++;
+	hbc_data_write(wr_data >> data_status.dump_index * 8);
+	data_status.dump_index++;
+	data_status.dumping_mem--;
 
-	req_next = 1;
+	data_req_next();
 
-	if (data_status.wr_index == 4) {
-	    data_status.write_addr += data_status.wr_index;
-	    data_status.wr_index = 0;
+	if (data_status.dump_index == 4) {
+	    data_status.dump_addr += data_status.dump_index;
+	    data_status.dump_index = 0;
 	}
     }
-
-    if (req_next) data_req_next();
 }
 DECLARE_HANDLER(INT(IRQ_HBC_DATA_SPI), hbc_data_irq);
+
+void hbc_spi_reply(uint32_t data, int size) {
+    data_status.reply_bytes = size;
+    data_status.reply_data = data;
+    hbc_data_irq();
+}
+
+void hbc_spi_dump_addr(uint32_t addr) {
+    data_status.dump_addr = addr;
+}
+
+void hbc_spi_load_addr(uint32_t addr) {
+    data_status.load_addr = addr;
+}
+
+void hbc_spi_dump_bytes(uint32_t bytes) {
+    data_status.dump_index = 0;
+    data_status.dumping_mem = bytes;
+    hbc_data_irq();
+}
+
+void hbc_spi_load_bytes(uint32_t bytes) {
+    data_status.load_index = 0;
+    data_status.loading_mem = bytes;
+}
 
 void hbc_spi_init(void (*fn)(uint8_t)) {
     irq = fn;
@@ -102,57 +135,6 @@ void hbc_spi_init(void (*fn)(uint8_t)) {
     ADD_INTERRUPT_HANDLER(INT(IRQ_HBC_DATA_SPI));
     GPO_CLEAR(HBC_DATA_INT);
     GPO_OUT(HBC_DATA_INT);
-}
-
-void hbc_data_arg_enable(void (*callback)(uint8_t arg), int enable) {
-    data_status.reading_arg = enable;
-    data_status.arg_callback = callback;
-}
-
-void hbc_data_read_to_mem_enable(int enable) {
-    if (enable) GPO_CLEAR(LED_1BIT);
-    else GPO_SET(LED_1BIT);
-    data_status.reading_mem = enable;
-    data_status.rd_index = 0;
-}
-
-void hbc_data_write_from_mem_enable(int enable) {
-    if (enable) GPO_CLEAR(LED_1BIT);
-    else GPO_SET(LED_1BIT);
-    data_status.writing = enable;
-    data_status.wr_index = 0;
-    /* Load up first byte */
-    if (enable) hbc_data_irq();
-}
-
-static void rd_addr_load(uint8_t arg) {
-    data_status.write_addr |= (arg << data_status.arg_index * 8);
-    data_status.arg_index--;
-
-    if (data_status.arg_index == -1) {
-	hbc_data_arg_enable(NULL, 0);
-    }
-}
-
-static void wr_addr_load(uint8_t arg) {
-    data_status.read_addr |= (arg << data_status.arg_index * 8);
-    data_status.arg_index--;
-
-    if (data_status.arg_index == -1) {
-	hbc_data_arg_enable(NULL, 0);
-    }
-}
-
-void hbc_data_mem_read_addr_helper(void) {
-    data_status.write_addr = 0;
-    data_status.arg_index = 3;
-    hbc_data_arg_enable(rd_addr_load, 1);
-    data_req_next();
-}
-
-void hbc_data_mem_write_addr_helper(void) {
-    data_status.read_addr = 0;
-    data_status.arg_index = 3;
-    hbc_data_arg_enable(wr_addr_load, 1);
-    data_req_next();
+    GPO_CLEAR(HBC_CTRL_INT);
+    GPO_OUT(HBC_CTRL_INT);
 }
