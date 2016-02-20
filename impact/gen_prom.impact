@@ -1,5 +1,5 @@
 setMode -pff
-addConfigDevice -name "PROM"
+addConfigDevice -name "tx_framer"
 setAttribute -configdevice -attr compressed -value "FALSE"
 setAttribute -configdevice -attr autoSize -value "FALSE"
 setAttribute -configdevice -attr fileFormat -value "mcs"

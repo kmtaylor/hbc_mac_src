@@ -2,6 +2,6 @@ setmode -bs
 setcable -p auto
 identify
 attachflash -position 1 -spi "M25P40"
-assignfiletoattachedflash -position 1 -file "PROM.mcs"
+assignfiletoattachedflash -position 1 -file "tx_framer.mcs"
 program -p 1 -dataWidth 1 -spionly -e -v -loadfpga
 quit

@@ -38,7 +38,7 @@ ELFSIZE += $(PROJECT_NAME).elf.size
 ELFCHECK += $(PROJECT_NAME).elf.elfcheck
 
 # All Target
-all: $(PROJECT_NAME).bit secondary-outputs
+all: $(PROJECT_NAME).mcs $(PROJECT_NAME).bit secondary-outputs
 
 # Tool invocations
 $(PROJECT_NAME).elf: $(OBJS) src/lscript.ld $(USER_OBJS)
@@ -67,6 +67,12 @@ $(PROJECT_NAME).bit: $(PROJECT_NAME).elf $(HDL_BUILD_LOCATION)/$(BITSTREAM)
 	    -bd $< tag $(MCS_INSTANCE_NAME) \
 	    -bt $(HDL_BUILD_LOCATION)/$(BITSTREAM) \
 	    -o b $@
+
+$(PROJECT_NAME).mcs: $(PROJECT_NAME).bit
+	impact -batch impact/gen_prom.impact
+	rm _impact*
+	rm $(PROJECT_NAME).cfi
+	rm $(PROJECT_NAME).prm
 
 src/%.o: src/%.c
 	mb-gcc -Wall -Os -c $(INCLUDE) $(CFLAGS) -o "$@" "$<"

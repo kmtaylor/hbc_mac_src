@@ -87,14 +87,10 @@ void flash_read(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
     flash_transfer(flash_addr);
 
     for (i = 0; i < size/4; i++) {
-	data = 0;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
+	data = flash_transfer(0x00);
+	data |= flash_transfer(0x00) << 8;
+	data |= flash_transfer(0x00) << 16;
+	data |= flash_transfer(0x00) << 24;
 	mem_write(data);
     }
     
@@ -115,14 +111,10 @@ int flash_verify(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
     flash_transfer(flash_addr);
 
     for (i = 0; i < size/4; i++) {
-	data = 0;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
-	data <<= 8;
-	data |= flash_transfer(0x00);
+	data = flash_transfer(0x00);
+	data |= flash_transfer(0x00) << 8;
+	data |= flash_transfer(0x00) << 16;
+	data |= flash_transfer(0x00) << 24;
 	if (data != mem_read()) retval = -1;
     }
     
@@ -155,10 +147,10 @@ void flash_write(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
 
 	for (i = 0; i < PAGE_SIZE/4; i++) {
 	    data = mem_read();
-	    flash_transfer(data >> 24);
-	    flash_transfer(data >> 16);
-	    flash_transfer(data >> 8);
 	    flash_transfer(data);
+	    flash_transfer(data >> 8);
+	    flash_transfer(data >> 16);
+	    flash_transfer(data >> 24);
 	}
 	flash_end();
 
