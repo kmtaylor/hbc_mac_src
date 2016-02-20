@@ -21,6 +21,7 @@
 
 #define FLASH_SIZE		    (512 * 1024)
 #define PAGE_SIZE		    256
+#define SECTOR_SIZE		    (256 * 256)
 
 #define FLASH_ADDR_FPGA_CONF	    0x00000
 #define FLASH_ADDR_PSOC_CONF	    0x60000
@@ -57,8 +58,30 @@ extern void flash_end(void);
 extern uint8_t flash_transfer(uint8_t data);
 
 extern uint32_t flash_get_id(void);
-extern void flash_read(uint32_t mem_addr);
-extern void flash_write(uint32_t mem_addr, uint32_t size);
-extern int flash_verify(uint32_t mem_addr, uint32_t size);
+extern void flash_read(uint32_t mem_addr, uint32_t size, uint32_t flash_addr);
+extern void flash_write(uint32_t mem_addr, uint32_t size, uint32_t flash_addr);
+extern int flash_verify(uint32_t mem_addr, uint32_t size, uint32_t flash_addr);
 
 extern uint8_t flash_read_status(void);
+
+static inline uint32_t flash_mem_to_page(uint32_t flash_addr) {
+    return flash_addr / PAGE_SIZE;
+}
+
+static inline uint32_t flash_mem_to_sector(uint32_t flash_addr) {
+    return flash_addr / SECTOR_SIZE;
+}
+
+static inline uint32_t flash_num_pages(uint32_t size) {
+    uint32_t pages;
+    pages = size / PAGE_SIZE;
+    if (size % PAGE_SIZE) pages++;
+    return pages;
+}
+
+static inline uint32_t flash_num_sectors(uint32_t size) {
+    uint32_t sectors;
+    sectors = size / SECTOR_SIZE;
+    if (size % SECTOR_SIZE) sectors++;
+    return sectors;
+}

@@ -70,8 +70,10 @@ static uint32_t buf_to_word(uint8_t *buf) {
 
 /* Interrupt context - interrupts are disabled */
 static void ctrl_cmd(uint8_t c) {
+    static uint32_t flash_addr;
     static uint8_t pkt[PACKET_SIZE];
     static uint8_t bytes_req;
+    uint32_t arg;
     uint8_t crc;
     int i;
 
@@ -95,6 +97,7 @@ static void ctrl_cmd(uint8_t c) {
 
     /* Acknowledge successful packet */
     hbc_spi_ack(HBC_ACK);
+    arg = buf_to_word(&pkt[PACKET_ARG_OFFSET]);
 
     switch(pkt[PACKET_CMD_OFFSET]) {
 	/* FPGA debug commands */
@@ -107,20 +110,20 @@ static void ctrl_cmd(uint8_t c) {
 
 	/* DRAM debug commands */
 	case CMD_MEM_READ:
-	    mem_set_rd_p(0);
+	    mem_set_rd_p(arg);
 	    hbc_spi_reply(mem_read(), 4);
 	    break;
 	case CMD_MEM_RD_ADDR:
-	    hbc_spi_dump_addr(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
+	    hbc_spi_dump_addr(arg);
 	    break;
 	case CMD_MEM_WR_ADDR:
-	    hbc_spi_load_addr(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
+	    hbc_spi_load_addr(arg);
 	    break;
 	case CMD_MEM_DUMP:
-	    hbc_spi_dump_bytes(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
+	    hbc_spi_dump_bytes(arg);
 	    break;
 	case CMD_MEM_LOAD:
-	    hbc_spi_load_bytes(buf_to_word(&pkt[PACKET_ARG_OFFSET]));
+	    hbc_spi_load_bytes(arg);
 	    break;
 	case CMD_MEM_TEST:
 	    hbc_spi_reply(mem_test(MEM_SIZE), 4);
@@ -128,13 +131,15 @@ static void ctrl_cmd(uint8_t c) {
 
 	/* Flash debug commands */
 	case CMD_FLASH_READ:
-	    flash_read(0);
-	    mem_set_rd_p(0);
+	    flash_read(0, FLASH_SIZE, 0);
 	    hbc_spi_reply(CMD_FLASH_READ, 4);
 	    break;
+	case CMD_FLASH_WRITE_ADDR:
+	    flash_addr = arg;
+	    break;
 	case CMD_FLASH_WRITE:
-	    flash_write(0, FPGA_CONFIG_SIZE);
-	    hbc_spi_reply(flash_verify(0, FPGA_CONFIG_SIZE), 4);
+	    flash_write(0, arg, flash_addr);
+	    hbc_spi_reply(flash_verify(0, arg, flash_addr), 4);
 	    break;
 
 	/* HBC_TX commands */

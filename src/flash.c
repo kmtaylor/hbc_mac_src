@@ -29,12 +29,25 @@ static void flash_write_enable(void) {
     flash_end();
 }
 
-static void flash_bulk_erase(void) {
+void flash_bulk_erase(void) {
     flash_write_enable();
     flash_start();
     flash_transfer(FLASH_BULK_ERASE);
     flash_end();
     while (flash_read_status() & FLASH_STATUS_WIP) {}
+}
+
+void flash_sector_erase(int sector, int num) {
+    while (num--) {
+	flash_write_enable();
+	flash_start();
+	flash_transfer(FLASH_SECTOR_ERASE);
+	flash_transfer(sector++);
+	flash_transfer(0);
+	flash_transfer(0);
+	flash_end();
+	while (flash_read_status() & FLASH_STATUS_WIP) {}
+    }
 }
 
 uint32_t flash_get_id(void) {
@@ -61,7 +74,7 @@ uint8_t flash_read_status(void) {
     return data;
 }
 
-void flash_read(uint32_t mem_addr) {
+void flash_read(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
     uint32_t i;
     uint32_t data;
 
@@ -69,11 +82,11 @@ void flash_read(uint32_t mem_addr) {
 
     flash_start();
     flash_transfer(FLASH_READ_DATA);
-    flash_transfer(0);
-    flash_transfer(0);
-    flash_transfer(0);
+    flash_transfer(flash_addr >> 16);
+    flash_transfer(flash_addr >> 8);
+    flash_transfer(flash_addr);
 
-    for (i = 0; i < FLASH_SIZE/4; i++) {
+    for (i = 0; i < size/4; i++) {
 	data = 0;
 	data |= flash_transfer(0x00);
 	data <<= 8;
@@ -88,7 +101,7 @@ void flash_read(uint32_t mem_addr) {
     flash_end();
 }
 
-int flash_verify(uint32_t mem_addr, uint32_t size) {
+int flash_verify(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
     uint32_t i;
     uint32_t data;
     int retval = 0;
@@ -97,9 +110,9 @@ int flash_verify(uint32_t mem_addr, uint32_t size) {
 
     flash_start();
     flash_transfer(FLASH_READ_DATA);
-    flash_transfer(0);
-    flash_transfer(0);
-    flash_transfer(0);
+    flash_transfer(flash_addr >> 16);
+    flash_transfer(flash_addr >> 8);
+    flash_transfer(flash_addr);
 
     for (i = 0; i < size/4; i++) {
 	data = 0;
@@ -118,25 +131,26 @@ int flash_verify(uint32_t mem_addr, uint32_t size) {
     return retval;
 }
 
-void flash_write(uint32_t mem_addr, uint32_t size) {
+void flash_write(uint32_t mem_addr, uint32_t size, uint32_t flash_addr) {
     uint32_t i, page, pages, data;
 
     /* Issue bulk erase */
-    flash_bulk_erase();
+    flash_sector_erase(flash_mem_to_sector(flash_addr), 
+		    flash_num_sectors(size));
 
-    pages = size/PAGE_SIZE;
-    if (size % PAGE_SIZE) pages++;
+    pages = flash_num_pages(size);
+    page = flash_mem_to_page(flash_addr);
 
     mem_set_rd_p(mem_addr);
 
     /* Programme pages */
-    for (page = 0; page < pages; page++) {
+    while (pages--) {
 	flash_write_enable();
 
 	flash_start();
 	flash_transfer(FLASH_PAGE_PROGRAM);
 	flash_transfer(page >> 8);
-	flash_transfer(page);
+	flash_transfer(page++);
 	flash_transfer(0);
 
 	for (i = 0; i < PAGE_SIZE/4; i++) {
