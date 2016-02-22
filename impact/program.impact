@@ -1,6 +1,6 @@
 setmode -bs
 setcable -p auto
 identify
-assignFile -p 1 -file "tx_framer.bit"
+assignFile -p 1 -file "hbc_mac.bit"
 program -p 1
 quit

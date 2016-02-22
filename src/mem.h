@@ -1,6 +1,7 @@
 #define MEM_SIZE	    (1024*1024*32)
 #define MEM_TX_BUF	    0
 #define MEM_RX_BUF	    (MEM_SIZE/2)
+#define MEM_TX_MASK	    (MEM_RX_BUF-1)
 
 #define MEM_READ_WRAP_16M   0x02
 #define MEM_WRITE_WRAP_16M  0x01

@@ -22,7 +22,7 @@ static uint32_t rd_packet_header;
 static uint32_t rd_packet_marker;
 
 static void read_headers(void) {
-    mem_set_rd_p(rd_packet_addr + 1);
+    mem_set_rd_p(rd_packet_addr);
     rd_packet_marker = mem_read();
     rd_packet_header = mem_read();
 }

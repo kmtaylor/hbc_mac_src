@@ -7,7 +7,7 @@ HDL_BUILD_LOCATION := $(HOME)/Xilinx/Projects/transceiver_spartan
 DEVICE := xc6slx9tqg144-2
 BITSTREAM := toplevel.bit
 
-PROJECT_NAME := tx_framer
+PROJECT_NAME := hbc_mac
 
 INCLUDE := -I$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/include
 INCLUDE += -I$(HDL_LOCATION)
@@ -19,6 +19,16 @@ CFLAGS += -DUSE_MEM=1
 LDFLAGS += -Wl,-T -Wl,src/lscript.ld -Wl,--gc-sections \
 	   -L$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/lib
 
+PSOC_FLASH_OBJS += \
+	cypress/ProgrammingSteps.o \
+	cypress/SWD_PacketLayer.o \
+	cypress/SWD_PhysicalLayer.o \
+	cypress/DataFetch.o \
+	cypress/DeviceAcquire.o \
+	cypress/Timeout.o \
+	cypress/TimeoutCalc.o \
+	cypress/psoc_flash.o
+	   
 OBJS += \
 	src/fifo.o \
 	src/mem.o \
@@ -38,13 +48,14 @@ ELFSIZE += $(PROJECT_NAME).elf.size
 ELFCHECK += $(PROJECT_NAME).elf.elfcheck
 
 # All Target
-all: $(PROJECT_NAME).mcs $(PROJECT_NAME).bit secondary-outputs
+all: $(PROJECT_NAME).bin
 
 # Tool invocations
-$(PROJECT_NAME).elf: $(OBJS) src/lscript.ld $(USER_OBJS)
+$(PROJECT_NAME).elf: $(OBJS) src/lscript.ld $(PSOC_FLASH_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: MicroBlaze gcc linker'
-	mb-gcc -o "$(PROJECT_NAME).elf" $(OBJS) $(CFLAGS) $(LDFLAGS) $(LIBS)
+	mb-gcc -o "$(PROJECT_NAME).elf" $(OBJS) $(PSOC_FLASH_OBJS) \
+		$(CFLAGS) $(LDFLAGS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -69,21 +80,28 @@ $(PROJECT_NAME).bit: $(PROJECT_NAME).elf $(HDL_BUILD_LOCATION)/$(BITSTREAM)
 	    -o b $@
 
 $(PROJECT_NAME).mcs: $(PROJECT_NAME).bit
-	impact -batch impact/gen_prom.impact
+	impact -batch impact/gen_prom.impact > /dev/null
 	rm _impact*
 	rm $(PROJECT_NAME).cfi
 	rm $(PROJECT_NAME).prm
 
-src/%.o: src/%.c
+%.bin: %.mcs
+	ihex2bin $<
+
+%.o: %.c
 	mb-gcc -Wall -Os -c $(INCLUDE) $(CFLAGS) -o "$@" "$<"
 	@echo ' '
 
-src/%.s: src/%.c
+%.s: %.c
 	mb-gcc -Wall -Os -S $(INCLUDE) $(CFLAGS) -o "$@" "$<"
 
 # Other Targets
 clean:
-	-$(RM) $(OBJS) $(ELFSIZE) $(ELFCHECK) $(PROJECT_NAME).elf
+	-$(RM) $(OBJS) $(PSOC_FLASH_OBJS) $(ELFSIZE) $(ELFCHECK)
+	-$(RM) $(PROJECT_NAME).elf
+	-$(RM) $(PROJECT_NAME).bin
+	-$(RM) $(PROJECT_NAME).mcs
+	-$(RM) $(PROJECT_NAME).bit
 	-@echo ' '
 
 secondary-outputs: $(ELFSIZE) $(ELFCHECK)

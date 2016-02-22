@@ -60,6 +60,7 @@ typedef struct {
 typedef uint16_t walsh_t;
 
 extern uint8_t crc8_update(uint8_t crc, uint8_t data);
+extern uint8_t crc8(uint32_t header);
 
 extern void build_tx_plcp_header(plcp_header_t *header_info);
-extern void build_tx_payload(plcp_header_t *header_info);
+extern uint8_t build_tx_payload(plcp_header_t *header_info);

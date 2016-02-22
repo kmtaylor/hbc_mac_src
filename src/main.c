@@ -16,6 +16,8 @@
 #include "interrupt.h"
 #include "extract_rx.h"
 
+#include "../cypress/psoc_flash.h"
+
 enum ctrl_state {
     CTRL_STATE_CMD,
     CTRL_STATE_REPLY,
@@ -25,6 +27,17 @@ enum ctrl_state {
 XIOModule io_mod;
 
 static volatile int send_packet;
+static volatile int tx_pending;
+static uint32_t pkt_addr;
+static volatile int rx_auto, tx_auto;
+
+static plcp_header_t header_info = {
+    .data_rate = r_sf_64,
+    .pilot_info = pilot_none,
+    .burst_mode = 0,
+    .use_ri = 1,
+    .scrambler_seed = 0,
+};
 
 static int rx_check_packet(void) {
     int bytes, correct = 0;
@@ -68,6 +81,19 @@ static uint32_t buf_to_word(uint8_t *buf) {
     return buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
 }
 
+static void reply_pkt(uint8_t cmd, uint8_t arg) {
+    uint32_t data;
+    uint8_t crc = CRC8_INIT;
+
+    data = PACKET_HEADER;
+    data |= cmd << 8;
+    data |= arg << 16;
+    crc = crc8(data);
+    data |= crc << 24;
+
+    hbc_spi_ack(data);
+}
+
 /* Interrupt context - interrupts are disabled */
 static void ctrl_cmd(uint8_t c) {
     static uint32_t flash_addr;
@@ -96,7 +122,7 @@ static void ctrl_cmd(uint8_t c) {
     if (crc) return;
 
     /* Acknowledge successful packet */
-    hbc_spi_ack(HBC_ACK);
+    reply_pkt(HBC_ACK, 0);
     arg = buf_to_word(&pkt[PACKET_ARG_OFFSET]);
 
     switch(pkt[PACKET_CMD_OFFSET]) {
@@ -120,10 +146,10 @@ static void ctrl_cmd(uint8_t c) {
 	    hbc_spi_load_addr(arg);
 	    break;
 	case CMD_MEM_DUMP:
-	    hbc_spi_dump_bytes(arg);
+	    hbc_spi_dump_bytes(arg, 0);
 	    break;
 	case CMD_MEM_LOAD:
-	    hbc_spi_load_bytes(arg);
+	    hbc_spi_load_bytes(arg, 0);
 	    break;
 	case CMD_MEM_TEST:
 	    hbc_spi_reply(mem_test(MEM_SIZE), 4);
@@ -142,9 +168,32 @@ static void ctrl_cmd(uint8_t c) {
 	    hbc_spi_reply(flash_verify(0, arg, flash_addr), 4);
 	    break;
 
+	/* PSoC flash commands */
+	case CMD_PSOC_FLASH:
+	    /* Never returns */
+	    psoc_flash_device();
+	    break;
+
 	/* HBC_TX commands */
 	case CMD_HBC_TX_TRIGGER:
 	    send_packet = 1;
+	    break;
+	case CMD_HBC_TX_SPREAD_FACTOR:
+	    header_info.data_rate = arg;
+	    break;
+	case CMD_HBC_TX_SCRAMBLER_SEED:
+	    header_info.scrambler_seed = arg;
+	    break;
+	case CMD_HBC_TX_AUTO:
+	    tx_auto = arg;
+	    break;
+	case CMD_HBC_TX_ADDR:
+	    pkt_addr = arg;
+	    hbc_spi_load_addr(arg);
+	    break;
+	case CMD_HBC_TX_PACKET:
+	    hbc_spi_load_bytes(arg, 1);
+	    tx_pending++;
 	    break;
 
 	/* HBC_RX commands */
@@ -169,6 +218,9 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_RX_CHECK:
 	    hbc_spi_reply(rx_check_packet(), 4);
 	    break;
+	case CMD_HBC_RX_AUTO:
+	    rx_auto = arg;
+	    break;
 
 	default:
 	    /* If pass through is enabled, pretend that we are the PSOC */
@@ -177,6 +229,31 @@ static void ctrl_cmd(uint8_t c) {
     }
 
     hbc_spi_data_trigger();
+}
+
+#define RX_PAD 4
+static void hbc_to_spi(void) {
+    int bytes;
+
+    if (!rx_packet_ready()) return;
+
+    if (!rx_check_crc_ok()) goto discard_packet;
+	
+    bytes = rx_packet_length();
+	
+    if (rx_bytes_read() < bytes) goto discard_packet;
+
+    /* Send packet ready command */
+    reply_pkt(RX_PACKET, bytes);
+    
+    /* Skip packet marker */
+    rx_read();
+    /* Dump packet and header */
+    hbc_spi_dump_bytes(bytes + HBC_HEADER_SIZE + RX_PAD, 1);
+
+discard_packet:
+    rx_packet_next();
+    return;
 }
 
 int main() {
@@ -203,27 +280,33 @@ int main() {
 
     GPO_SET(LED_1BIT);
 
-    plcp_header_t header_info = {
-	.data_rate = r_sf_8,
-        .pilot_info = pilot_none,
-        .burst_mode = 0,
-	.use_ri = 1,
-        .scrambler_seed = 0,
-        .PDSU_length = 254,
-    };
-
     while (1) {
 	if (send_packet) {
-
+	    /* Send a single packet starting at memory address 0 */
 	    disable_interrupts();
 	    mem_set_rd_p(0);
 	    build_tx_plcp_header(&header_info);
 	    build_tx_payload(&header_info);
 	    enable_interrupts();
-
 	    send_packet = 0;
 	}
-    }
 
-    return 0;
+	if (tx_auto && tx_pending) {
+	    /* Check TX circular buffer for a packet to send */
+	    disable_interrupts();
+	    mem_set_rd_p(pkt_addr);
+	    header_info.PDSU_length = mem_read();
+	    build_tx_plcp_header(&header_info);
+	    pkt_addr += (build_tx_payload(&header_info) * 4) + 4;
+	    pkt_addr &= MEM_TX_MASK;
+	    enable_interrupts();
+
+	    tx_pending--;
+	}
+
+	if (rx_auto) {
+	    /* Check RX circular buffer for a packet to send */
+	    hbc_to_spi();
+	}
+    }
 }

@@ -35,7 +35,7 @@ uint8_t crc8_update(uint8_t crc, uint8_t data) {
     return crc;
 }
 
-static uint8_t crc8(uint32_t header) {
+uint8_t crc8(uint32_t header) {
     uint8_t crc = CRC8_INIT;
 
     crc = crc8_update(crc, header >> 0);
@@ -167,9 +167,10 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
     }
 }
 
-void build_tx_payload(plcp_header_t *header_info) {
+uint8_t build_tx_payload(plcp_header_t *header_info) {
     uint32_t data;
     uint8_t num_words = header_info->PDSU_length / 4;
+    uint8_t rv = num_words;
     if (header_info->PDSU_length % 4) num_words++;
 
     fifo_set_rate(header_info->data_rate);
@@ -183,4 +184,6 @@ void build_tx_payload(plcp_header_t *header_info) {
 
     fifo_flush();
     fifo_trigger();
+
+    return rv;
 }
