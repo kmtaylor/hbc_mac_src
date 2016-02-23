@@ -1,0 +1,1090 @@
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/DataFetch.c" cypress/DataFetch.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/DataFetch.c"	2011-12-01 20:30:38.000000000 +1100
++++ cypress/DataFetch.c	2016-02-20 22:36:56.000000000 +1100
+@@ -14,8 +14,11 @@
+ /********************************************************************************
+ *   Header file Inclusion
+ ********************************************************************************/
++#include <stdint.h>
+ #include "DataFetch.h"
+-#include "HexImage.h"
++
++#include "../src/mem.h"
++#include "../src/flash.h"
+ 
+ /********************************************************************************
+ *   Global Constant declaration
+@@ -27,12 +30,6 @@
+    constants are loaded in to the arrays passed a parameters to function.
+    These should be modified if different interface is used to get hex file data */
+    
+-extern unsigned char const DeviceJtagId_HexFile[JTAG_ID_BYTE_LENGTH]; 
+-extern unsigned char const DeviceConfigNvl_HexFile[NVL_BYTE_LENGTH]; 
+-extern unsigned char const WriteOnceNvl_HexFile[NVL_BYTE_LENGTH]; 
+-extern unsigned char const ChecksumData_HexFile[CHECKSUM_BYTE_LENGTH]; 
+-extern unsigned char const FlashData_HexFile[NUMBER_OF_FLASH_ROWS_HEX_FILE][FLASH_ROW_BYTE_SIZE_HEX_FILE]; 
+-extern unsigned char const FlashProtectionData_HexFile[FLASH_PROTECTION_BYTE_SIZE_HEX_FILE]; 
+ 
+ /********************************************************************************
+ *   Function Definitions
+@@ -64,10 +61,14 @@
+ void LoadDeviceJtagId(unsigned char * DeviceJtagId)
+ {
+     unsigned char i;
++    uint32_t data;
+     
++    mem_set_rd_p(FLASH_ADDR_PSOC_JTAG);
++    data = mem_read();
+     for(i = 0; i < JTAG_ID_BYTE_LENGTH; i++)
+     {
+-        DeviceJtagId[i] = DeviceJtagId_HexFile[i];
++        DeviceJtagId[i] = (unsigned char) data;
++	data >>= 8;
+     }
+ }
+ 
+@@ -92,10 +93,14 @@
+ void LoadDeviceConfigNvl(unsigned char * DeviceConfigNvl)
+ {
+     unsigned char i;
++    uint32_t data;
+     
++    mem_set_rd_p(FLASH_ADDR_PSOC_NVL);
++    data = mem_read();
+     for(i = 0; i < NVL_BYTE_LENGTH; i++)
+     {
+-        DeviceConfigNvl[i] = DeviceConfigNvl_HexFile[i];
++        DeviceConfigNvl[i] = (unsigned char) data;
++	data >>= 8;
+     }
+   
+ }
+@@ -120,10 +125,14 @@
+ void LoadWriteOnceNvl(unsigned char * WriteOnceNvl)
+ {
+     unsigned char i;
++    uint32_t data;
+     
++    mem_set_rd_p(FLASH_ADDR_PSOC_WOL);
++    data = mem_read();
+     for(i = 0; i < NVL_BYTE_LENGTH; i++)
+     {
+-        WriteOnceNvl[i] = WriteOnceNvl_HexFile[i];
++        WriteOnceNvl[i] = (unsigned char) data;
++	data >>= 8;
+     }
+     
+ }
+@@ -152,10 +161,14 @@
+ void LoadFlashRowData(unsigned short RowNumber, unsigned short RowByteSize, unsigned char * FlashRowData)
+ {
+     unsigned short i; /* Maximum value of 'i' can be 288, so declare as 16-bit unsigned int */
++    uint32_t data = 0;
+     
++    mem_set_rd_p(FLASH_ADDR_PSOC_FLASH + (RowNumber * FLASH_PSOC_ROW_SIZE));
+     for(i = 0; i < RowByteSize; i++)
+     {
+-        FlashRowData[i] = FlashData_HexFile [RowNumber][i];
++	if ((i % 4) == 0) data = mem_read();
++        FlashRowData[i] = (unsigned char) data;
++	data >>= 8;
+     }
+ }
+ 
+@@ -182,10 +195,14 @@
+ void LoadFlashProtectionData(unsigned short ProtectionByteSize, unsigned char * FlashRowData)
+ {
+     unsigned short i;
+-    
++    uint32_t data = 0;
++
++    mem_set_rd_p(FLASH_ADDR_PSOC_PROTECT);
+     for(i = 0; i < ProtectionByteSize; i++)
+     {
+-        FlashRowData[i] = FlashProtectionData_HexFile[i];
++	if ((i % 4) == 0) data = mem_read();
++        FlashRowData[i] = (unsigned char) data;
++	data >>= 8;
+     }    
+ }
+ 
+@@ -209,10 +226,14 @@
+ void LoadChecksumData(unsigned char * ChecksumData)
+ {
+     unsigned char i;
++    uint32_t data;
+ 
++    mem_set_rd_p(FLASH_ADDR_PSOC_CHKSUM);
++    data = mem_read();
+     for(i = 0; i < CHECKSUM_BYTE_LENGTH; i++)
+     {
+-        ChecksumData[i] = ChecksumData_HexFile[i];
++        ChecksumData[i] = (unsigned char) data;
++	data >>= 8;
+     }
+ }
+ 
+@@ -237,7 +258,7 @@
+ *******************************************************************************/
+ unsigned short GetFlashRowCount()
+ {
+-    return(NUMBER_OF_FLASH_ROWS_HEX_FILE);
++    return(FLASH_PSOC_ROW_COUNT);
+ }
+ 
+ /*******************************************************************************
+@@ -261,7 +282,7 @@
+ *******************************************************************************/
+ unsigned short GetFlashRowByteSize()
+ {
+-    return(FLASH_ROW_BYTE_SIZE_HEX_FILE);
++    return(FLASH_PSOC_ROW_SIZE);
+ }
+ 
+ /* [] END OF FILE */
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/DeviceAcquire.c" cypress/DeviceAcquire.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/DeviceAcquire.c"	2011-12-04 23:35:26.000000000 +1100
++++ cypress/DeviceAcquire.c	2016-02-23 11:05:09.000000000 +1100
+@@ -15,6 +15,7 @@
+ /********************************************************************************
+ *   Header file Inclusion
+ ********************************************************************************/
++#include <xiomodule.h>
+ #include "DeviceAcquire.h"
+ 
+ /* "SWD_PhysicalLayer.h" file contains the bit banging routines for SWD protocol.
+@@ -23,6 +24,7 @@
+ #include "SWD_PhysicalLayer.h"
+ #include "SWD_PacketLayer.h"
+ #include "Timeout.h"
++#include "../src/gpio.h"
+ 
+ /********************************************************************************
+ *   Global Variable declaration
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/psoc_flash.c" cypress/psoc_flash.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/psoc_flash.c"	2011-12-03 18:00:36.000000000 +1100
++++ cypress/psoc_flash.c	2016-02-23 10:57:49.000000000 +1100
+@@ -11,12 +11,17 @@
+ *  Remove the Character LCD functions while porting the code to non PSoC 5 host programmer.
+ *******************************************************************************/
+ 
+-/* This file is included for calling Character LCD functions in PSoC 5.
+-   Remove this header file while porting to non PSoC 5 host programmer*/
+-#include <device.h> 
++#include <xiomodule.h>
++#include <stdint.h>
+ 
+ /* This file has the top level HSSP routines that should be called from main application code */
+ #include "ProgrammingSteps.h"
++#include <preprocessor/constants.vhh>
++#include "RegisterDefines.h"
++#include "TimeoutCalc.h"
++
++#include "../src/gpio.h"
++#include "../src/flash.h"
+ 
+ unsigned char CurrentStep; /* Global variable that stores the current HSSP Programming step number */
+ 
+@@ -96,58 +101,62 @@
+     return(SUCCESS); /* All the steps were completed successfully */
+ }
+ 
+-void main()
++static void sleep(int length) {
++    volatile int counter = length;
++    while (counter) counter--;
++}
++
++static void led_status(int status) {
++    while (1) {
++	GPO_CLEAR(LED_1BIT);
++	sleep(status ? 5E5 : 50E5);
++	GPO_SET(LED_1BIT);
++	sleep(status ? 5E5 : 50E5);
++    }
++}
++
++#define CALIBRATE 0
++int psoc_flash_device(void)
+ {
++
++#if CALIBRATE
++    TESTPIN_DRIVEMODE_CMOSOUT;
++    for(;;) {
++	//TestDelayHundredUs();
++	//TestSwdck();
++	//TestSwdReadPacket();
++	//TestAcquirePacket();
++    }
++#else
+     unsigned char ProgramResult;  /* Variable to store the result of HSSP operation */ 
+     unsigned char ErrorStatus;    /* Variable to store the HSSP Error status in case of failure */
+-    unsigned char SpcErrorStatus; /* Variable to store the SPC Error status if ErrorStatus contains SPC_TIMEOUT_ERROR error*/ 
+ 
+-    LCD_Char_1_Start();    /* Initialize Character LCD  */
+-    
+-    LCD_Char_1_Position(0,0);
+-    LCD_Char_1_PrintString("Programming PSoC");
++    flash_read(FLASH_ADDR_PSOC_CONF, FLASH_PSOC_SIZE, FLASH_ADDR_PSOC_CONF);
+     
+     /* Start the HSSP Programming and store the status */
+     ProgramResult = ProgramDevice();
+     
+-    /* Character LCD will display the status of HSSP Programming  */
+-    LCD_Char_1_ClearDisplay();    
+     
+     if(ProgramResult == SUCCESS) /* HSSP completed successfully */
+     {
+-        LCD_Char_1_Position(0,0);
+-        LCD_Char_1_PrintString("HSSP Success");    
++	led_status(1);
+     }
+     else /* HSSP Failure */
+     { 
+-        /* Display the step number where the HSSP failed */
+-        LCD_Char_1_Position(0,0);
+-        LCD_Char_1_PrintString("HSSP Fail Step");
+-        LCD_Char_1_PrintInt8(CurrentStep);
+-        
+         /* Get the HSSP error status and display on THE LCD */
+         ErrorStatus = ReadHsspErrorStatus();        
+         
+-        LCD_Char_1_Position(1,0);
+-        LCD_Char_1_PrintString("Err ");
+-        LCD_Char_1_PrintInt8(ErrorStatus);
+-        
+         /* If the ErrorStatus contains THE SPC_TIMEOUT_ERROR error condition,
+            read the SPC status register and display on THE LCD */
+         if(ErrorStatus & SPC_TIMEOUT_ERROR)
+         {
+-            SpcErrorStatus = ReadSpcStatusReg();
+-            
+-            LCD_Char_1_PrintString(" SPC ");
+-            LCD_Char_1_PrintInt8(SpcErrorStatus);            
+         }
+-    } 
+ 
+-    for(;;)
+-    {
+-        
+-        
++	led_status(0);
+     }
++#endif
++
++    return 0;
+ }
+ 
+ /* [] END OF FILE */
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/psoc_flash.h" cypress/psoc_flash.h
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/psoc_flash.h"	1970-01-01 10:00:00.000000000 +1000
++++ cypress/psoc_flash.h	2016-02-20 22:52:30.000000000 +1100
+@@ -0,0 +1 @@
++extern int psoc_flash_device(void);
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/RegisterDefines.h" cypress/RegisterDefines.h
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/RegisterDefines.h"	2011-12-01 18:29:52.000000000 +1100
++++ cypress/RegisterDefines.h	2016-02-20 23:12:25.000000000 +1100
+@@ -28,68 +28,5 @@
+ * pin selection
+ ********************************************************************************/
+ 
+-#define SWDIO_PRT_NUM   0
+-#define SWDIO_PIN_NUM   0
+-
+-#define SWDCK_PRT_NUM   0
+-#define SWDCK_PIN_NUM   1
+-
+-#define XRES_PRT_NUM    0
+-#define XRES_PIN_NUM    2
+-
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-************************  INPUT, OUTPUT, DRIVE MODE REGISTERS ***************
+-*
+-* PSoC 5 host programmer I/O registers are 8-bits wide. The addresses of the
+-* PSoC 5 I/O registers defined below are from the PSoC 5 Technical Reference Manual.
+-* The defines below are "Value at the 8-bit register address".
+-* The defines are used to change the pin output(OUT_REG), read the
+-* pin input (IN_REG), and also to change the pin drive mode(DM_REG).
+-* 
+-* Modify these definitions as applicable for your Host programmer.
+-********************************************************************************/
+-
+-#define SWDIO_PRT_OUT_REG     (*((volatile unsigned char *)(0x40005100 + (SWDIO_PRT_NUM * 0x10)))) 
+-#define SWDIO_PRT_IN_REG      (*((volatile unsigned char *)(0x40005101 + (SWDIO_PRT_NUM * 0x10))))
+-#define SWDIO_PIN_DM_REG      (*((volatile unsigned char *)(0x40005000 + (SWDIO_PRT_NUM * 8) + SWDIO_PIN_NUM)))
+-
+-#define SWDCK_PRT_OUT_REG     (*((volatile unsigned char *)(0x40005100 + (SWDCK_PRT_NUM * 0x10))))
+-#define SWDCK_PIN_DM_REG      (*((volatile unsigned char *)(0x40005000 + (SWDCK_PRT_NUM * 8) + SWDCK_PIN_NUM)))
+-
+-#define XRES_PRT_OUT_REG      (*((volatile unsigned char *)(0x40005100 + (XRES_PRT_NUM * 0x10))))
+-#define XRES_PIN_DM_REG       (*((volatile unsigned char *)(0x40005000 + (XRES_PRT_NUM * 8) + XRES_PIN_NUM)))
+-
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-************** Mask values for manipulating Port pins ***************************
+-*
+-* These mask values will be used to modify the specific bits of a
+-* Port register (8-bits wide) like Port input/output registers. These will be
+-* used to set a output pin as high or low, or return the logic state (high or low)
+-* of an input pin.
+-* 
+-* Modify these as applicable for Host programmer.
+-******************************************************************************/
+-#define XRES_PIN_MASK   (0x01 << XRES_PIN_NUM)
+-#define SWDCK_PIN_MASK  (0x01 << SWDCK_PIN_NUM)
+-#define SWDIO_PIN_MASK  (0x01 << SWDIO_PIN_NUM)
+-
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-********** Mask values for Pin Drive mode configuration *************************
+-*
+-* Mask definitions below are for configuring the pin drive modes of Host PSoC 5.
+-*
+-* Output pins should be in Strong drive (CMOS Drive) mode and input pins should
+-* be in High impedance digital (High-Z) drive mode.
+-*
+-* Modify these mask values as applicable for Host programmer.
+-********************************************************************************/
+-#define HIGHZIN_DM_ANDMASK  0xF1
+-#define HIGHZIN_DM_ORMASK   0x02
+-#define CMOSOUT_DM_ANDMASK  0xF1
+-#define CMOSOUT_DM_ORMASK   0x0C
+-
+ #endif /* __REGISTERDEFINES_H */
+ //[] END OF FILE
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PacketLayer.c" cypress/SWD_PacketLayer.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PacketLayer.c"	2012-11-12 20:46:20.000000000 +1100
++++ cypress/SWD_PacketLayer.c	2016-02-23 11:17:06.000000000 +1100
+@@ -14,6 +14,8 @@
+ /********************************************************************************
+ *   Header file Inclusion
+ ********************************************************************************/
++#include <xiomodule.h>
++#include "../src/gpio.h"
+ #include "SWD_PacketLayer.h"
+ 
+ /* "SWD_PhysicalLayer.h" file contains the bit banging routines for programming */
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PhysicalLayer.c" cypress/SWD_PhysicalLayer.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PhysicalLayer.c"	2011-12-01 18:45:48.000000000 +1100
++++ cypress/SWD_PhysicalLayer.c	2016-02-20 23:16:15.000000000 +1100
+@@ -12,322 +12,72 @@
+ *  Modify the definitions as applicable for your Host Programmer.
+ *******************************************************************************/
+ 
+-/********************************************************************************
+-*   Header file Inclusion
+-********************************************************************************/
++#include <xiomodule.h>
++#include "../src/gpio.h"
+ #include "SWD_PhysicalLayer.h"
+ 
+-/********************************************************************************
+-*   Function Definitions
+-********************************************************************************/
+-
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-******************* SWD Protocol Physical Layer functions ***********************
+-*
+-* All of the function definitions below are for a PSoC 5 host programmer.
+-* Modify the definitions as applicable for the specific host programmer.
+-********************************************************************************/
+-
+-/*******************************************************************************
+-* Function Name: SetSwdckCmosOutput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDCK pin drive mode as CMOS drive mode.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDCK_DRIVEMODE_CMOSOUT in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdckCmosOutput()
+ {
+-    SWDCK_PIN_DM_REG = (SWDCK_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK;
++    SWDCK_DRIVEMODE_CMOSOUT;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdckHizInput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDCK pin drive mode as High impedance digital input.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDCK_DRIVEMODE_HIGHZIN in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdckHizInput()
+ {
+-    SWDCK_PIN_DM_REG = (SWDCK_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK;
++    SWDCK_DRIVEMODE_HIGHZIN;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdioCmosOutput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDIO pin drive mode as CMOS drive mode.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDIO_DRIVEMODE_CMOSOUT in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdioCmosOutput()
+ {
+-    SWDIO_PIN_DM_REG = (SWDIO_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK;
++    SWDIO_DRIVEMODE_CMOSOUT;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdioHizInput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDIO pin drive mode as High impedance digital input.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDIO_DRIVEMODE_HIGHZIN in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdioHizInput()
+ {
+-    SWDIO_PIN_DM_REG = (SWDIO_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK;        
++    SWDIO_DRIVEMODE_HIGHZIN;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetXresCmosOutput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the XRES pin drive mode as CMOS drive mode.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition XRES_DRIVEMODE_CMOSOUT in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetXresCmosOutput()
+ {
+-    XRES_PIN_DM_REG = (XRES_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK;
++    XRES_DRIVEMODE_CMOSOUT;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetXresHizInput
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the XRES pin drive mode as High impedance digital input.
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition XRES_DRIVEMODE_HIGHZIN in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetXresHizInput()
+ {
+-    XRES_PIN_DM_REG = (XRES_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK;
++    XRES_DRIVEMODE_HIGHZIN;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdckHigh
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDCK pin high
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDCK_OUTPUT_HIGH in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdckHigh()
+ {
+-    SWDCK_PRT_OUT_REG = SWDCK_PRT_OUT_REG | SWDCK_PIN_MASK;    
++    SWDCK_OUTPUT_HIGH;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdckLow
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDCK pin low
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDCK_OUTPUT_LOW in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdckLow()
+ {
+-    SWDCK_PRT_OUT_REG = SWDCK_PRT_OUT_REG & (~SWDCK_PIN_MASK);
++    SWDCK_OUTPUT_LOW;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdioHigh
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDIO pin high
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDIO_OUTPUT_HIGH in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdioHigh()
+ {
+-    SWDIO_PRT_OUT_REG = SWDIO_PRT_OUT_REG | SWDIO_PIN_MASK;
++    SWDIO_OUTPUT_HIGH;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetSwdioLow
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the SWDIO pin low
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDIO_OUTPUT_LOW in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetSwdioLow()
+ {
+-    SWDIO_PRT_OUT_REG = SWDIO_PRT_OUT_REG & (~SWDIO_PIN_MASK);
++    SWDIO_OUTPUT_LOW;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetXresHigh
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the XRES pin high
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition XRES_OUTPUT_HIGH in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetXresHigh()
+ {
+-    XRES_PRT_OUT_REG = XRES_PRT_OUT_REG | XRES_PIN_MASK;
++    XRES_OUTPUT_HIGH;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: SetXresLow
+-********************************************************************************
+-*
+-* Summary:
+-*  Sets the XRES pin low
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  None.
+-*
+-* Note:
+-*  The function definition is the same as the macro definition XRES_OUTPUT_LOW in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ void SetXresLow()
+ {
+-    XRES_PRT_OUT_REG = XRES_PRT_OUT_REG & (~XRES_PIN_MASK);
++    XRES_OUTPUT_LOW;
+ }
+ 
+-/*******************************************************************************
+-* Function Name: ReadSwdio
+-********************************************************************************
+-*
+-* Summary:
+-*  Returns the state of the SWDIO input pin
+-*
+-* Parameters:
+-*  None.
+-*
+-* Return:
+-*  unsigned char (only one of the two values as given below)
+-*   0x00 - If the SWDIO pin state is low
+-*   0x01 - If the SWDIO pin state is high
+-*
+-* Note:
+-*  The function definition is the same as the macro definition SWDIO_INPUT_READ in
+-*  SWD_PhysicalLayer.h.
+-*
+-*******************************************************************************/
+ unsigned char ReadSwdio()
+ {
+-    return((SWDIO_PRT_IN_REG >> SWDIO_PIN_NUM) & 0x01);
++    return SWDIO_INPUT_READ;
+ }
+ 
+-/* [] END OF FILE */
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PhysicalLayer.h" cypress/SWD_PhysicalLayer.h
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/SWD_PhysicalLayer.h"	2011-12-07 19:58:10.000000000 +1100
++++ cypress/SWD_PhysicalLayer.h	2016-02-20 23:10:45.000000000 +1100
+@@ -25,57 +25,28 @@
+ #ifndef __SWD_PHYSICALLAYER_H
+ #define __SWD_PHYSICALLAYER_H
+ 
+-/* Host programmer registers, mask values are defined in "RegisterDefines.h" */
++#include <xiomodule.h>
++#include <preprocessor/constants.vhh>
+ #include "RegisterDefines.h"
+ 
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-**************** Macros for Host Pin Drive mode configuration *******************
+-*
+-* Uses the register definitions, mask values in "RegisterDefines.h" to
+-* configure the pin drive mode
+-*
+-* SWDIO pin on host side - CMOS output (host writes data to PSoC 3),
+-*                          High Z digital input (host reads data from PSoC 3 or when host is not programming PSoC 3 (idle))
+-*
+-* SWDCK pin on host side - CMOS output (when host is programming PSoC 3),
+-*                          High Z digital input (when host is not programming PSoC 3 (idle))
+-*
+-* XRES pin on host side -  CMOS output (when host is programming PSoC 3)
+-*                          High Z digital input (when host is not programming PSoC 3 (idle))
+-*
+-* Modify these as applicable to your Host Programmer
+-********************************************************************************/
++#define SWDIO_DRIVEMODE_HIGHZIN	    GPO_IN(PSOC_DATA)
++#define SWDIO_DRIVEMODE_CMOSOUT	    GPO_OUT(PSOC_DATA)
+ 
+-#define SWDIO_DRIVEMODE_HIGHZIN         (SWDIO_PIN_DM_REG = (SWDIO_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK)        
+-#define SWDIO_DRIVEMODE_CMOSOUT         (SWDIO_PIN_DM_REG = (SWDIO_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK)
++#define SWDCK_DRIVEMODE_HIGHZIN	    GPO_IN(PSOC_CLOCK)
++#define SWDCK_DRIVEMODE_CMOSOUT	    GPO_OUT(PSOC_CLOCK)
+ 
+-#define SWDCK_DRIVEMODE_HIGHZIN         (SWDCK_PIN_DM_REG = (SWDCK_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK)
+-#define SWDCK_DRIVEMODE_CMOSOUT         (SWDCK_PIN_DM_REG = (SWDCK_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK)
+-                                           
+-#define XRES_DRIVEMODE_CMOSOUT          (XRES_PIN_DM_REG = (XRES_PIN_DM_REG & CMOSOUT_DM_ANDMASK) | CMOSOUT_DM_ORMASK)
+-#define XRES_DRIVEMODE_HIGHZIN          (XRES_PIN_DM_REG = (XRES_PIN_DM_REG & HIGHZIN_DM_ANDMASK) | HIGHZIN_DM_ORMASK)
++#define XRES_DRIVEMODE_HIGHZIN	    GPO_IN(PSOC_RESET)
++#define XRES_DRIVEMODE_CMOSOUT	    GPO_OUT(PSOC_RESET)
+ 
+ 
+-/***************************** USER ATTENTION REQUIRED **************************
+-***************************** HOST PROCESSOR SPECIFIC ***************************
+-**************** Macros for driving output pins on host side ********************
+-*
+-* Uses the register definitions, mask values in "RegisterDefines.h" to drive
+-* output pins either to logic high (suffixed by 'HIGH') or
+-* logic low (suffixed by 'LOW')
+-*
+-* Modify these as applicable to your Host Programmer
+-********************************************************************************/
+-
+-#define SWDIO_OUTPUT_HIGH      (SWDIO_PRT_OUT_REG = SWDIO_PRT_OUT_REG | SWDIO_PIN_MASK)
+-#define SWDIO_OUTPUT_LOW       (SWDIO_PRT_OUT_REG = SWDIO_PRT_OUT_REG & (~SWDIO_PIN_MASK))
++#define SWDIO_OUTPUT_HIGH	    GPO_SET(PSOC_DATA)
++#define SWDIO_OUTPUT_LOW	    GPO_CLEAR(PSOC_DATA)
+ 
+-#define SWDCK_OUTPUT_HIGH      (SWDCK_PRT_OUT_REG = SWDCK_PRT_OUT_REG | SWDCK_PIN_MASK)
+-#define SWDCK_OUTPUT_LOW       (SWDCK_PRT_OUT_REG = SWDCK_PRT_OUT_REG & (~SWDCK_PIN_MASK))
++#define SWDCK_OUTPUT_HIGH	    GPO_SET(PSOC_CLOCK)
++#define SWDCK_OUTPUT_LOW	    GPO_CLEAR(PSOC_CLOCK)
+ 
+-#define XRES_OUTPUT_HIGH       (XRES_PRT_OUT_REG = XRES_PRT_OUT_REG | XRES_PIN_MASK)
+-#define XRES_OUTPUT_LOW        (XRES_PRT_OUT_REG = XRES_PRT_OUT_REG & (~XRES_PIN_MASK))
++#define	XRES_OUTPUT_HIGH	    GPO_SET(PSOC_RESET)
++#define	XRES_OUTPUT_LOW		    GPO_CLEAR(PSOC_RESET)
+ 
+ /***************************** USER ATTENTION REQUIRED **************************
+ ***************************** HOST PROCESSOR SPECIFIC ***************************
+@@ -90,7 +61,7 @@
+ * Modify this as applicable to your Host Programmer
+ ********************************************************************************/
+ 
+-#define SWDIO_INPUT_READ      ((SWDIO_PRT_IN_REG >> SWDIO_PIN_NUM) & 0x01)
++#define SWDIO_INPUT_READ	    GPI_READ(PSOC_DATA)
+ 
+ /********************************************************************************
+ *   Function Prototypes
+@@ -112,6 +83,5 @@
+ void SetXresCmosOutput(void);
+ void SetXresHizInput(void);
+ 
+-
+ #endif /* __SWD_PHYSICALLAYER_H */
+ //[] END OF FILE
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/Timeout.c" cypress/Timeout.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/Timeout.c"	2011-12-04 20:44:58.000000000 +1100
++++ cypress/Timeout.c	2016-02-20 21:59:04.000000000 +1100
+@@ -39,7 +39,7 @@
+ 
+ void DelayHundredUs(void)
+ {
+-    unsigned short timestamp;    
++    volatile unsigned short timestamp;    
+ 
+     /* Delay using a empty for loop */
+     for(timestamp = 0; timestamp < XRES_PULSE_100US; timestamp++)
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/TimeoutCalc.c" cypress/TimeoutCalc.c
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/TimeoutCalc.c"	1970-01-01 10:00:00.000000000 +1000
++++ cypress/TimeoutCalc.c	2016-02-20 23:17:18.000000000 +1100
+@@ -0,0 +1,157 @@
++/*******************************************************************************
++* File Name: TimeoutCalc.c
++* Version 1.0
++*
++* Description:
++*  This file provides source code for the functions used to calculate the 
++*  timeout parameters used in the HSSP application
++*
++* Note:
++*  Refer to the header file TimeoutCalc.h for the procedure to calculate the 
++*  timeout parameters
++*******************************************************************************/
++
++/********************************************************************************
++*   Header file Inclusion
++********************************************************************************/
++#include <xiomodule.h>
++#include "../src/gpio.h"
++#include "TimeoutCalc.h"
++#include "Timeout.h"
++#include "SWD_PhysicalLayer.h"
++#include "SWD_PacketLayer.h"
++
++/********************************************************************************
++*   Function Definitions
++********************************************************************************/
++
++/*******************************************************************************
++* Function Name: TestDelayHundredUs
++********************************************************************************
++*
++* Summary:
++*  This function is used to calculate the timing parameter XRES_PULSE_100US
++*
++* Parameters:
++*  None
++*
++* Return:
++*  None
++*
++* Note:
++*  Refer to the explanation of the parameter XRES_PULSE_100US in the file
++*  TimeoutCalc.h for details on using this function to calculate the parameter
++*  XRES_PULSE_100US  
++*
++*******************************************************************************/
++
++void TestDelayHundredUs(void)
++{
++    volatile unsigned short timestamp;
++        
++    TESTPIN_OUTPUT_LOW; /* Make the pin low before start of the delay */
++    
++    /* For loop to introduce the 100 us delay */
++    for(timestamp = 0; timestamp < XRES_PULSE_100US; timestamp++)
++    {
++
++    }
++    
++    TESTPIN_OUTPUT_HIGH; /* Make the pin high after end of the delay */
++}
++
++/*******************************************************************************
++* Function Name: TestSwdReadPacket
++********************************************************************************
++*
++* Summary:
++*  This function is used to calculate the timing parameter SPC_POLLING_TIMEOUT
++*
++* Parameters:
++*  None
++*
++* Return:
++*  None
++*
++* Note:
++*  Refer to the explanation of the parameter SPC_POLLING_TIMEOUT in the file
++*  TimeoutCalc.h for details on using this function to calculate the parameter
++*  SPC_POLLING_TIMEOUT  
++*
++*******************************************************************************/
++void TestSwdReadPacket()
++{       
++    TESTPIN_OUTPUT_LOW; /* Make the pin low before sending SWD read packet */     
++
++    Swd_RawReadPacket(); /* Send a single SWD read packet */
++        
++    TESTPIN_OUTPUT_HIGH; /* Make the pin high after sending SWD read packet */
++}
++
++/*******************************************************************************
++* Function Name: TestAcquirePacket
++********************************************************************************
++*
++* Summary:
++*  This function is used to calculate the timing parameter DEVICE_ACQUIRE_TIMEOUT
++*
++* Parameters:
++*  None
++*
++* Return:
++*  None
++*
++* Note:
++*  Refer to the explanation of the parameter DEVICE_ACQUIRE_TIMEOUT in the file
++*  TimeoutCalc.h for details on using this function to calculate the parameter
++*  DEVICE_ACQUIRE_TIMEOUT  
++*
++*******************************************************************************/
++void TestAcquirePacket()
++{
++    TESTPIN_OUTPUT_LOW; /* Make the pin low before sending SWD acquire packet */
++
++    /* Send a dummy packet with all zeros since this is a test function  */
++    Swd_PacketHeader =  0x00;
++    Swd_PacketData[3] = 0x00;Swd_PacketData[2] = 0x00;Swd_PacketData[1] = 0x00;Swd_PacketData[0] = 0x00;
++    Swd_WritePacket_Fast(0x00);
++
++    TESTPIN_OUTPUT_HIGH;  /* Make the pin high after sending SWD acquire packet */
++}
++
++/*******************************************************************************
++* Function Name: TestSwdck
++********************************************************************************
++*
++* Summary:
++*  This function is used to calculate the timing parameter TIME_WINDOW_68US
++*
++* Parameters:
++*  None
++*
++* Return:
++*  None
++*
++* Note:
++*  Refer to the explanation of the parameter TIME_WINDOW_68US in the file
++*  TimeoutCalc.h for details on using this function to calculate the parameter
++*  TIME_WINDOW_68US  
++*
++*******************************************************************************/
++void TestSwdck()
++{
++    unsigned short time_elapsed;
++       
++    TESTPIN_OUTPUT_LOW; /* Make the pin low before sending SWD clock train */
++    
++    /* For loop that does a clocking of the SWDCK for >= 68 us duration */
++    for(time_elapsed = 0; time_elapsed < TIME_WINDOW_68US; time_elapsed++)
++    {
++        SWDCK_OUTPUT_LOW;
++        SWDCK_OUTPUT_HIGH;
++    }
++    
++    TESTPIN_OUTPUT_HIGH; /* Make the pin high after sending SWD clock train */
++}
++
++/* [] END OF FILE */
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/TimeoutCalc.h" cypress/TimeoutCalc.h
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/TimeoutCalc.h"	1970-01-01 10:00:00.000000000 +1000
++++ cypress/TimeoutCalc.h	2016-02-20 21:59:20.000000000 +1100
+@@ -0,0 +1,97 @@
++/*******************************************************************************
++* File Name: TimeoutCalc.h
++* Version 1.0
++*
++* Description:
++*  This header file contains the definitions for the timeout parameters, declaration 
++*  of the functions used for calculating the the timeout parameters.
++*
++* Note:
++*  The timeout values given below are applicable for a PSoC 5 Host processor with the CPU
++*  operating at a clock frequency of 63 MHz. A test pin defined as TESTPIN
++*  is used to arrive at these timeout values by toggling the pin, and measuring the low 
++*  pulse width of the square wave on the test pin using an oscilloscope.
++*******************************************************************************/
++#ifndef __TIMEOUTCALC_H
++#define __TIMEOUTCALC_H
++
++/***************************** USER ATTENTION REQUIRED **************************
++***************************** HOST PROCESSOR SPECIFIC ***************************
++***************************** Macros for the TESTPIN ****************************/
++
++#define TESTPIN_OUTPUT_HIGH        GPO_SET(PSOC_RESET)
++#define TESTPIN_OUTPUT_LOW	   GPO_CLEAR(PSOC_RESET)
++
++#define TESTPIN_DRIVEMODE_CMOSOUT  GPO_OUT(PSOC_RESET)
++
++/***************************** USER ATTENTION REQUIRED **************************
++***************************** HOST PROCESSOR SPECIFIC ***************************
++***************************** Timeout parameter definitions *********************
++*
++* The below four timeout values namely: XRES_PULSE_100US, TIME_WINDOW_68US, DEVICE_ACQUIRE_TIMEOUT,
++* and SPC_POLLING_TIMEOUT should be calculated by calling the corresponding functions 
++* in the for loop of the main() function  and measuring the low pulse width
++* of the square wave signal on the TESTPIN. Refer to the procedure given for calculating each
++* of the parameters below.
++* The default definitions below are for a PSoC 5 host programmer operating at a frequency of 66 MHZ.
++*
++* Modify these values as required for your host processor. 
++
++********************************************************************************/
++
++/*********************Calculating XRES_PULSE_100US *******************************************
++1.) Call ONLY the function TestDelayHundredUs(), defined in TimeoutCalc.c, in the for loop of the main code
++2.) Note down the LOW PULSE WIDTH (Tlow) of the square wave on the pin TEST_PIN
++3.) Tune the value of the definition XRES_PULSE_100US below till the low pulse width (Tlow)
++    is JUST GREATER than 100uS 
++4.) For example, for a PSoC 5 host programmer operating at 63MHz, defining the 
++    XRES_PULSE_100US as 600 gave a low pulse width of 100 uS. This was used in the HSSP code.
++5.) This parameter is referred to as TRESET in the programming specifications document.
++
++*********************************************************************************/
++
++/*********************Calculating TIME_WINDOW_68US *******************************************
++1.) Call ONLY the function TestSwdck(), defined in TimeoutCalc.c, in the for loop of the main code
++2.) Note down the LOW PULSE WIDTH (Tlow) of the square wave on the pin TEST_PIN
++3.) Tune the value of the definition TIME_WINDOW_68US below till the low pulse width (Tlow)
++    is JUST GREATER than 68uS (70us - 75us would be sufficient)
++4.) For example, for a PSoC 5 host programmer operating at 63MHz, defining the 
++    TIME_WINDOW_68US as 118 gave a low pulse width of 71 uS. This was used in the HSSP code.
++5.) This parameter is referred to as TBOOT in the programming specifications document.
++
++*********************************************************************************/
++
++
++/*********************Calculating DEVICE_ACQUIRE_TIMEOUT *******************************************
++1.) Call ONLY the function TestAcquirePacket(), defined in TimeoutCalc.c, in the for loop of the main code
++2.) Note down the LOW PULSE WIDTH (Tlow in us) of the square wave on the pin TEST_PIN
++3.) DEVICE_ACQUIRE_TIMEOUT = (327 us)/(Tlow), rounded off to the next higher integer
++4.) For example, for a PSoC 5 host programmer operating at 63MHz, Tlow was 68.4uS.
++    So, DEVICE_ACQUIRE_TIMEOUT = (327 us)/(66 us) = 4.9 = 5. This value was used in the HSSP code.
++5.) The value 327us is derived from the programming specifications document
++    based on the difference of Ttestmode(min) and Tboot. 395us - 68us = 327us.
++6.) An important factor to consider is that this value should be greater than or equal to 4 to program
++    target PSoC 3 / PSoC 5. Because a maximum of 4 SWD packets are required to acquire target PSoC 3 / PSoC 5 device. If this value is 
++    less than 4, optimize the acquire code so that Tlow duration is reduced, and the value is >= 4.
++*********************************************************************************/
++
++/*********************Calculating SPC_POLLING_TIMEOUT *******************************************
++1.) Call ONLY the function TestSwdReadPacket(), defined in TimeoutCalc.c, in the for loop of the main code
++2.) Note down the LOW PULSE WIDTH (Tlow in us) of the square wave on the pin TEST_PIN
++3.) SPC_POLLING_TIMEOUT = (1000000 us)/(Tlow), rounded off to the next higher integer
++4.) For example, for a PSoC 5 host programmer operating at 63MHz, Tlow was 119uS.
++    So, SPC_POLLING_TIMEOUT = (1000000us)/(119us) = 8404. This value was used in the HSSP code.
++5.) The value 1000000us (1 second) is derived from the programming specifications document
++    based on the SPC polling timeout duration whoch is 1 second..
++*********************************************************************************/
++
++/********************************************************************************
++*   Function Prototypes
++********************************************************************************/
++void TestDelayHundredUs(void);
++void TestSwdck(void);
++void TestSwdReadPacket(void);
++void TestAcquirePacket(void);
++
++#endif /* __TIMEOUTCALC_H */
++//[] END OF FILE
+diff -urN "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/Timeout.h" cypress/Timeout.h
+--- "/home/kmtaylor/PSoC/programmer/prog/PSoC Creator Project/AN73054/A_PSoC3_Hssp_Programmer.cydsn/src/Timeout.h"	2011-12-28 22:53:34.000000000 +1100
++++ cypress/Timeout.h	2016-02-20 21:59:20.000000000 +1100
+@@ -30,10 +30,10 @@
+ * host programmer
+ ********************************************************************************/
+ 
+-#define XRES_PULSE_100US  600
+-#define TIME_WINDOW_68US 118
++#define XRES_PULSE_100US  590
++#define TIME_WINDOW_68US 81
+ #define DEVICE_ACQUIRE_TIMEOUT 5
+-#define SPC_POLLING_TIMEOUT 8404
++#define SPC_POLLING_TIMEOUT 12658
+ 
+ /********************************************************************************
+ *   Function Prototypes
