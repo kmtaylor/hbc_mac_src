@@ -31,6 +31,8 @@ static volatile int tx_pending;
 static uint32_t pkt_addr;
 static volatile int rx_auto, tx_auto;
 
+static volatile int do_psoc_flash;
+
 static plcp_header_t header_info = {
     .data_rate = r_sf_64,
     .pilot_info = pilot_none,
@@ -170,8 +172,7 @@ static void ctrl_cmd(uint8_t c) {
 
 	/* PSoC flash commands */
 	case CMD_PSOC_FLASH:
-	    /* Never returns */
-	    psoc_flash_device();
+	    do_psoc_flash = 1;
 	    break;
 
 	/* HBC_TX commands */
@@ -307,6 +308,13 @@ int main() {
 	if (rx_auto) {
 	    /* Check RX circular buffer for a packet to send */
 	    hbc_to_spi();
+	}
+
+	if (do_psoc_flash) {
+	    disable_interrupts();
+	    psoc_flash_device();
+	    enable_interrupts();
+	    do_psoc_flash = 0;
 	}
     }
 }

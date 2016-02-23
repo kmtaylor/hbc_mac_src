@@ -14,4 +14,4 @@ extern XIOModule io_mod;
                             (1 << INT(GPO_##gpo##_DIR)))
 
 #define GPI_READ(gpi) \
-    (XIOModule_DiscreteRead(&io_mod, INT(GPP_##gpi) & (1 << INT(GPI_##gpi))))
+    (XIOModule_DiscreteRead(&io_mod, INT(GPP_##gpi)) & (1 << INT(GPI_##gpi)))
