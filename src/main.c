@@ -107,6 +107,7 @@ static void ctrl_cmd(uint8_t c) {
     uint32_t arg;
     uint8_t crc;
     int i;
+    int do_ack = HBC_ACK;
 
     if (!bytes_req) {
 	if (c == PACKET_HEADER) bytes_req = PACKET_SIZE;
@@ -126,8 +127,6 @@ static void ctrl_cmd(uint8_t c) {
     }
     if (crc) return;
 
-    /* Acknowledge successful packet */
-    reply_pkt(HBC_ACK, 0);
     arg = buf_to_word(&pkt[PACKET_ARG_OFFSET]);
 
     switch(pkt[PACKET_CMD_OFFSET]) {
@@ -198,6 +197,7 @@ static void ctrl_cmd(uint8_t c) {
 	    break;
 	case CMD_HBC_TX_PACKET:
 	    hbc_spi_load_bytes(arg, 1);
+	    do_ack = NO_ACK;
 	    tx_pending++;
 	    break;
 
@@ -226,12 +226,19 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_RX_AUTO:
 	    rx_auto = arg;
 	    break;
+	case CMD_HBC_RX_GET_ADDR:
+	    hbc_spi_reply(rx_read_addr(), 4);
+	    break;
 
 	default:
 	    /* If pass through is enabled, pretend that we are the PSOC */
-	    hbc_spi_ack(PSOC_ACK);
+	    do_ack = PSOC_ACK;
 	    break;
     }
+    
+    /* Acknowledge successful packet */
+    if (do_ack != NO_ACK)
+	reply_pkt(do_ack, 0);
 
     hbc_spi_data_trigger();
 }

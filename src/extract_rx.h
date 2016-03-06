@@ -8,3 +8,5 @@ extern void rx_packet_next(void);
 extern uint32_t rx_bytes_read(void);
 extern void rx_enable(void);
 extern void rx_disable(void);
+
+extern uint32_t rx_read_addr(void);

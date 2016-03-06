@@ -15,7 +15,7 @@ static uint32_t rd_buf_addr = MEM_RX_BUF;
 static uint32_t wr_buf_addr = MEM_RX_BUF;
 static uint32_t wr_bytes; 
 
-static int packet_ready;
+static volatile int packet_ready;
 static uint32_t rd_packet_addr = MEM_RX_BUF;
 static uint32_t wr_packet_addr;
 static uint32_t rd_packet_header;
@@ -68,7 +68,13 @@ uint32_t rx_read(void) {
     return mem_read();
 }
 
+uint32_t rx_read_addr(void) {
+    return rd_packet_addr; 
+}
+
 void rx_packet_next(void) {
+    if (rd_packet_marker == -1) return;
+
     /* 8 Extra bytes for packet marker and header */
     rd_packet_addr += rd_packet_marker;
 
@@ -85,7 +91,7 @@ static void rx_data_int_func(void) {
 	wr_packet_addr = wr_buf_addr;
 	val = fifo_read();
 	/* Leave space for packet marker */
-	mem_write(val);
+	mem_write(-1);
 	mem_write(val);
 	inc_wr_buf();
 	inc_wr_buf();
@@ -112,10 +118,8 @@ static void rx_ready_int_func(void) {
 
     if (wr_bytes) {
 	/* Write packet marker */ 
-	tmp = mem_get_wr_p();
 	mem_set_wr_p(wr_packet_addr);
 	mem_write(wr_bytes);
-	mem_set_wr_p(tmp);
 
 	rx_state = packet_init;
 	GPO_SET(HBC_RX_PKT_ACK);

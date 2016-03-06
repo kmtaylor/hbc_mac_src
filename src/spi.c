@@ -11,7 +11,7 @@
 
 static void (*irq)(uint8_t cmd);
 
-static struct {
+static volatile struct {
     uint32_t load_addr;
     uint32_t dump_addr;
     uint32_t loading_mem;
