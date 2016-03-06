@@ -163,6 +163,10 @@ int hbc_spi_load_busy(void) {
     return data_status.loading_mem ? 1 : 0;
 }
 
+int hbc_spi_dump_busy(void) {
+    return data_status.dumping_mem ? 1 : 0;
+}
+
 void hbc_spi_init(void (*fn)(uint8_t)) {
     irq = fn;
     ADD_INTERRUPT_HANDLER(INT(IRQ_HBC_CTRL_SPI));
