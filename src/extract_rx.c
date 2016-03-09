@@ -21,6 +21,7 @@ static uint32_t wr_packet_addr;
 static uint32_t rd_packet_header;
 static uint32_t rd_packet_marker;
 
+/* Should be called with interrupts disabled */
 static void read_headers(void) {
     mem_set_rd_p(rd_packet_addr);
     rd_packet_marker = mem_read();
@@ -62,6 +63,7 @@ int rx_check_crc_ok(void) {
     return crc ? 0 : 1;
 }
 
+/* Should be called with interrupts disabled */
 uint32_t rx_read(void) {
     mem_set_rd_p(rd_buf_addr);
     inc_rd_buf();
@@ -109,8 +111,6 @@ static void rx_data_int_func(void) {
 }
 
 static void rx_ready_int_func(void) {
-    uint32_t tmp;
-
     if (IRQ_FLAG_SET(IRQ_RX_DATA_READY)) {
 	/* If there is any data left, read out the last bytes */
 	rx_data_int_func();

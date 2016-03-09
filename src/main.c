@@ -247,7 +247,11 @@ static void ctrl_cmd(uint8_t c) {
 static void hbc_to_spi(void) {
     int bytes;
 
-    if (!rx_packet_ready()) return;
+    disable_interrupts();
+    if (!rx_packet_ready()) {
+	enable_interrupts();
+	return;
+    }
 
     if (!rx_check_crc_ok()) goto discard_packet;
 	
@@ -269,6 +273,7 @@ static void hbc_to_spi(void) {
 
 discard_packet:
     rx_packet_next();
+    enable_interrupts();
     return;
 }
 
