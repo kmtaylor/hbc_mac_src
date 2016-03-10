@@ -18,7 +18,6 @@
 
 #include "../cypress/psoc_flash.h"
 
-#define LOOPBACK	    1
 #define PSOC_FLASH_ON_BOOT  0
 
 enum ctrl_state {
@@ -35,6 +34,7 @@ static uint32_t pkt_addr;
 static volatile int rx_auto, tx_auto;
 
 static volatile int do_psoc_flash = PSOC_FLASH_ON_BOOT;
+static volatile int loopback;
 
 static plcp_header_t header_info = {
     .data_rate = r_sf_64,
@@ -200,6 +200,9 @@ static void ctrl_cmd(uint8_t c) {
 	    do_ack = NO_ACK;
 	    tx_pending++;
 	    break;
+	case CMD_HBC_TX_LOOPBACK:
+	    loopback = arg;
+	    break;
 
 	/* HBC_RX commands */
 	case CMD_HBC_RX_READY:
@@ -319,9 +322,7 @@ int main() {
 		(tx_pending > 1) || 
 		((tx_pending == 1) && !hbc_spi_load_busy()))) {
 	    /* Check TX circular buffer for a packet to send */
-#if !LOOPBACK
-	    rx_disable();
-#endif
+	    if (!loopback) rx_disable();
 	    disable_interrupts();
 	    mem_set_rd_p(pkt_addr);
 	    header_info.PDSU_length = mem_read();
@@ -331,9 +332,7 @@ int main() {
 	    pkt_addr &= MEM_TX_MASK;
 	    /* The scrambler seed is to be toggled each frame (10.7.1) */
 	    header_info.scrambler_seed = !header_info.scrambler_seed;
-#if !LOOPBACK
-	    rx_enable();
-#endif
+	    if (!loopback) rx_enable();
 
 	    tx_pending--;
 	}
