@@ -74,6 +74,10 @@ uint32_t rx_read_addr(void) {
     return rd_packet_addr; 
 }
 
+uint32_t rx_write_addr(void) {
+    return wr_packet_addr;
+}
+
 void rx_packet_next(void) {
     if (rd_packet_marker == -1) return;
 
@@ -122,11 +126,12 @@ static void rx_ready_int_func(void) {
 	mem_write(wr_bytes);
 
 	rx_state = packet_init;
-	GPO_SET(HBC_RX_PKT_ACK);
-	GPO_CLEAR(HBC_RX_PKT_ACK);
 	packet_ready++;
 	wr_bytes = 0;
     }
+
+    GPO_SET(HBC_RX_PKT_ACK);
+    GPO_CLEAR(HBC_RX_PKT_ACK);
 }
 
 DECLARE_HANDLER(INT(IRQ_RX_FIFO_ALMOST_FULL), rx_data_int_func);

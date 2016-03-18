@@ -10,3 +10,4 @@ extern void rx_enable(void);
 extern void rx_disable(void);
 
 extern uint32_t rx_read_addr(void);
+extern uint32_t rx_write_addr(void);

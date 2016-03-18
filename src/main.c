@@ -229,8 +229,11 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_RX_AUTO:
 	    rx_auto = arg;
 	    break;
-	case CMD_HBC_RX_GET_ADDR:
+	case CMD_HBC_RX_GET_RD_ADDR:
 	    hbc_spi_reply(rx_read_addr(), 4);
+	    break;
+	case CMD_HBC_RX_GET_WR_ADDR:
+	    hbc_spi_reply(rx_write_addr(), 4);
 	    break;
 
 	default:
@@ -258,13 +261,13 @@ static void hbc_to_spi(void) {
 
     if (!rx_check_crc_ok()) goto discard_packet;
 	
-    static int toggle;
-    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
-    toggle = !toggle;
     bytes = rx_packet_length();
 	
     if (rx_bytes_read() < bytes) goto discard_packet;
 
+    static int toggle;
+    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
+    toggle = !toggle;
     /* Send packet ready command */
     reply_pkt(RX_PACKET, bytes);
     
@@ -321,6 +324,9 @@ int main() {
 	if (tx_auto && (
 		(tx_pending > 1) || 
 		((tx_pending == 1) && !hbc_spi_load_busy()))) {
+    static int toggle;
+    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
+    toggle = !toggle;
 	    /* Check TX circular buffer for a packet to send */
 	    if (!loopback) rx_disable();
 	    disable_interrupts();
