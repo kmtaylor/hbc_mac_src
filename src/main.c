@@ -221,6 +221,9 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_TX_LOOPBACK:
 	    loopback = arg;
 	    break;
+	case CMD_HBC_TX_FILTER:
+	    arg ? GPO_CLEAR(HBC_DATA_SWITCH) : GPO_SET(HBC_DATA_SWITCH);
+	    break;
 
 	/* HBC_RX commands */
 	case CMD_HBC_RX_READY:
