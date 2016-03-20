@@ -47,6 +47,7 @@ enum ctrl_state {
 XIOModule io_mod;
 
 static volatile int send_packet;
+static volatile int tx_flood, rx_flood;
 static volatile int tx_pending;
 static uint32_t pkt_addr;
 static volatile int rx_auto, tx_auto;
@@ -224,6 +225,9 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_TX_FILTER:
 	    arg ? GPO_CLEAR(HBC_DATA_SWITCH) : GPO_SET(HBC_DATA_SWITCH);
 	    break;
+	case CMD_HBC_TX_FLOOD:
+	    tx_flood = arg;
+	    break;
 
 	/* HBC_RX commands */
 	case CMD_HBC_RX_READY:
@@ -256,6 +260,9 @@ static void ctrl_cmd(uint8_t c) {
 	case CMD_HBC_RX_GET_WR_ADDR:
 	    hbc_spi_reply(rx_write_addr(), 4);
 	    break;
+	case CMD_HBC_RX_FLOOD:
+	    rx_flood = arg;
+	    break;
 
 	default:
 	    /* If pass through is enabled, pretend that we are the PSOC */
@@ -270,8 +277,14 @@ static void ctrl_cmd(uint8_t c) {
     hbc_spi_data_trigger();
 }
 
+static void led_toggle(void) {
+    static int toggle;
+    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
+    toggle = !toggle;
+}
+
 #define RX_PAD 4
-static void hbc_to_spi(void) {
+static void hbc_to_spi(int forward_packet) {
     int bytes;
 
     disable_interrupts();
@@ -286,17 +299,18 @@ static void hbc_to_spi(void) {
 	
     if (rx_bytes_read() < bytes) goto discard_packet;
 
-    static int toggle;
-    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
-    toggle = !toggle;
-    /* Send packet ready command */
-    reply_pkt(RX_PACKET, bytes);
+    led_toggle();
+
+    if (forward_packet) {
+	/* Send packet ready command */
+	reply_pkt(RX_PACKET, bytes);
     
-    /* Skip packet marker */
-    rx_read();
-    /* Dump packet and header */
-    hbc_spi_dump_bytes(bytes + HBC_HEADER_SIZE + RX_PAD, 1);
-    hbc_spi_data_trigger();
+	/* Skip packet marker */
+	rx_read();
+	/* Dump packet and header */
+	hbc_spi_dump_bytes(bytes + HBC_HEADER_SIZE + RX_PAD, 1);
+	hbc_spi_data_trigger();
+    }
 
 discard_packet:
     rx_packet_next();
@@ -329,8 +343,9 @@ int main() {
     GPO_CLEAR(LED_1BIT);
 
     while (1) {
-	if (send_packet) {
+	if (send_packet || tx_flood) {
 	    /* Send a single packet starting at memory address 0 */
+	    if (!loopback) rx_disable();
 	    disable_interrupts();
 	    mem_set_rd_p(0);
 	    build_tx_plcp_header(&header_info);
@@ -338,6 +353,7 @@ int main() {
 	    enable_interrupts();
 	    /* The scrambler seed is to be toggled each frame (10.7.1) */
 	    header_info.scrambler_seed = !header_info.scrambler_seed;
+	    if (!loopback) rx_enable();
 
 	    send_packet = 0;
 	}
@@ -345,9 +361,7 @@ int main() {
 	if (tx_auto && (
 		(tx_pending > 1) || 
 		((tx_pending == 1) && !hbc_spi_load_busy()))) {
-    static int toggle;
-    toggle ? GPO_CLEAR(LED_1BIT) : GPO_SET(LED_1BIT);
-    toggle = !toggle;
+	    led_toggle();
 	    /* Check TX circular buffer for a packet to send */
 	    if (!loopback) rx_disable();
 	    disable_interrupts();
@@ -364,9 +378,9 @@ int main() {
 	    tx_pending--;
 	}
 
-	if (rx_auto && !hbc_spi_dump_busy()) {
+	if (rx_flood || (rx_auto && !hbc_spi_dump_busy())) {
 	    /* Check RX circular buffer for a packet to send */
-	    hbc_to_spi();
+	    hbc_to_spi(!rx_flood);
 	}
 
 	if (do_psoc_flash) {
