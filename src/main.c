@@ -345,6 +345,7 @@ int main() {
     while (1) {
 	if (send_packet || tx_flood) {
 	    /* Send a single packet starting at memory address 0 */
+	    led_toggle();
 	    if (!loopback) rx_disable();
 	    disable_interrupts();
 	    mem_set_rd_p(0);

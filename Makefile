@@ -16,17 +16,19 @@
 # along with hbc_mac.  If not, see <http://www.gnu.org/licenses/>.
 
 #LIBS := -Wl,--start-group,-lxil,-lgcc,-lc,--end-group
-MCS_INSTANCE_NAME := mcs_0
+MCS_INSTANCE := mcs_0
 BSP_LOCATION := ../standalone_bsp_0
 HARDWARE_DESC_LOCATION := ../Genesys_64k/system.xml
 HDL_LOCATION := $(HOME)/Xilinx/Projects/transceiver
-HDL_BUILD_LOCATION := $(HOME)/Xilinx/Projects/transceiver_spartan
+HDL_BUILD_LOCATION := $(HOME)/Xilinx/Projects/transceiver/build
+IP_CORE_LOCATION := $(HDL_BUILD_LOCATION)/cores
+MCS_MEM_MAP := $(IP_CORE_LOCATION)/$(MCS_INSTANCE)/$(MCS_INSTANCE)_bd.bmm
 DEVICE := xc6slx9tqg144-2
-BITSTREAM := toplevel.bit
+BITSTREAM := hbc_mac.bit
 
 PROJECT_NAME := hbc_mac
 
-INCLUDE := -I$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/include
+INCLUDE := -I$(BSP_LOCATION)/$(MCS_INSTANCE)/include
 INCLUDE += -I$(HDL_LOCATION)
 
 CFLAGS += -mno-xl-reorder -mlittle-endian -mcpu=v8.40.a -mxl-soft-mul \
@@ -34,7 +36,7 @@ CFLAGS += -mno-xl-reorder -mlittle-endian -mcpu=v8.40.a -mxl-soft-mul \
 CFLAGS += -DUSE_MEM=1
 
 LDFLAGS += -Wl,-T -Wl,src/lscript.ld -Wl,--gc-sections \
-	   -L$(BSP_LOCATION)/$(MCS_INSTANCE_NAME)/lib
+	   -L$(BSP_LOCATION)/$(MCS_INSTANCE)/lib
 
 PSOC_FLASH_OBJS += \
 	cypress/ProgrammingSteps.o \
@@ -85,14 +87,14 @@ $(PROJECT_NAME).elf.size: $(PROJECT_NAME).elf
 $(PROJECT_NAME).elf.elfcheck: $(PROJECT_NAME).elf
 	@echo 'Invoking: Xilinx ELF Check'
 	elfcheck $(PROJECT_NAME).elf -hw $(HARDWARE_DESC_LOCATION) \
-		-pe $(MCS_INSTANCE_NAME) | tee "$(PROJECT_NAME).elf.elfcheck"
+		-pe $(MCS_INSTANCE) | tee "$(PROJECT_NAME).elf.elfcheck"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 $(PROJECT_NAME).bit: $(PROJECT_NAME).elf $(HDL_BUILD_LOCATION)/$(BITSTREAM)
 	data2mem -p $(DEVICE) \
-	    -bm $(HDL_BUILD_LOCATION)/ipcore_dir/$(MCS_INSTANCE_NAME)_bd.bmm \
-	    -bd $< tag $(MCS_INSTANCE_NAME) \
+	    -bm $(MCS_MEM_MAP) \
+	    -bd $< tag $(MCS_INSTANCE) \
 	    -bt $(HDL_BUILD_LOCATION)/$(BITSTREAM) \
 	    -o b $@
 
