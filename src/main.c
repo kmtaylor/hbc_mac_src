@@ -33,7 +33,6 @@
 #include "scrambler.h"
 #include "interrupt.h"
 #include "extract_rx.h"
-#include "md5.h"
 
 #include "../cypress/psoc_flash.h"
 
@@ -63,6 +62,44 @@ static plcp_header_t header_info = {
     .use_ri = 1,
     .scrambler_seed = 0,
 };
+
+static int rx_check_packet(void) {
+    int bytes, correct = 0;
+    uint32_t data, chk;
+
+    if (!rx_packet_ready()) return -1;
+
+    if (!rx_check_crc_ok()) goto discard_packet;
+	
+    bytes = rx_packet_length();
+	
+    if (rx_bytes_read() < bytes) goto discard_packet;
+
+    /* Ignore packet marker and header */
+    data = rx_read();
+    data = rx_read();
+
+    mem_set_rd_p(0);
+    chk = mem_read();
+    data = rx_read();
+    while (bytes) {
+	if ((chk & 0xff) == (data & 0xff)) correct++;
+	chk >>= 8;
+	data >>= 8;
+	bytes--;
+	if (bytes && ((bytes % 4) == 0)) {
+	    chk = mem_read();
+	    data = rx_read();
+	}
+    }
+
+    rx_packet_next();
+    return correct;
+
+discard_packet:
+    rx_packet_next();
+    return -1;
+}
 
 static uint32_t buf_to_word(uint8_t *buf) {
     return buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
@@ -212,7 +249,7 @@ static void ctrl_cmd(uint8_t c) {
 	    rx_packet_next();
 	    break;
 	case CMD_HBC_RX_CHECK:
-	    hbc_spi_reply(rx_check_packet(1), 4);
+	    hbc_spi_reply(rx_check_packet(), 4);
 	    break;
 	case CMD_HBC_RX_AUTO:
 	    rx_auto = arg;
@@ -312,15 +349,15 @@ int main() {
 	    if (!loopback) rx_disable();
 	    disable_interrupts();
 	    mem_set_rd_p(0);
-	    build_tx_plcp_header(&header_info, 1);
-	    build_tx_payload(&header_info, 1);
+	    build_tx_plcp_header(&header_info);
+	    build_tx_payload(&header_info);
 	    enable_interrupts();
 	    /* The scrambler seed is to be toggled each frame (10.7.1) */
 	    header_info.scrambler_seed = !header_info.scrambler_seed;
 	    if (!loopback) rx_enable();
 
-	    send_packet = 0;
 	    if (tx_flood) tx_flood--;
+	    send_packet = 0;
 	}
 
 	if (tx_auto && (
@@ -332,8 +369,8 @@ int main() {
 	    disable_interrupts();
 	    mem_set_rd_p(pkt_addr);
 	    header_info.PDSU_length = mem_read();
-	    build_tx_plcp_header(&header_info, 0);
-	    pkt_addr += (build_tx_payload(&header_info, 0) * 4) + 4;
+	    build_tx_plcp_header(&header_info);
+	    pkt_addr += (build_tx_payload(&header_info) * 4) + 4;
 	    enable_interrupts();
 	    pkt_addr &= MEM_TX_MASK;
 	    /* The scrambler seed is to be toggled each frame (10.7.1) */

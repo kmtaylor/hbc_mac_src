@@ -28,7 +28,6 @@
 #include "scrambler.h"
 #include "build_tx.h"
 #include "mem.h"
-#include "md5.h"
 
 static uint32_t rd_buf_addr = MEM_RX_BUF;
 static uint32_t wr_buf_addr = MEM_RX_BUF;
@@ -69,46 +68,6 @@ uint8_t rx_packet_length(void) {
 
 uint32_t rx_bytes_read(void) {
     return rd_packet_marker - 8;
-}
-
-int rx_check_packet(int checksum) {
-    static uint32_t checksum_buffer[256 / 4];
-    uint32_t sum[MD5_DIGEST_SIZE];
-    struct md5_ctx ctx;
-    int i, bytes, correct = 1;
-
-    if (!rx_packet_ready()) return -1;
-
-    if (!rx_check_crc_ok()) goto discard_packet;
-
-    bytes = rx_packet_length();
-
-    if (rx_bytes_read() < bytes) goto discard_packet;
-
-    /* Ignore packet marker and header */
-    rx_read();
-    rx_read();
-
-    if (checksum) {
-	for (i = 0; i < bytes / 4; i++) {
-	    checksum_buffer[i] = rx_read();
-	}
-
-	md5_init_ctx(&ctx);
-	md5_process_bytes(checksum_buffer, bytes - MD5_DIGEST_SIZE, &ctx);
-	md5_finish_ctx(&ctx, sum);
-
-	for (i = 0; i < MD5_DIGEST_SIZE / 4; i++) {
-	    if (checksum_buffer[bytes/4 + i] != sum[i]) correct = 0;
-	}
-    }
-
-    rx_packet_next();
-    return correct;
-
-discard_packet:
-    rx_packet_next();
-    return -1;
 }
 
 int rx_check_crc_ok(void) {
