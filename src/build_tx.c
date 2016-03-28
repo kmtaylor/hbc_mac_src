@@ -26,6 +26,7 @@
 #include "mem.h"
 #include "lcd.h"
 #include "interrupt.h"
+#include "md5.h"
 #else
 extern void fifo_write(uint32_t data);
 extern uint32_t scrambler_read(void);
@@ -38,6 +39,20 @@ extern void fifo_write_size(uint8_t size);
 #endif
 
 #include "build_tx.h"
+
+static void calc_checksum(int num_words, uint32_t *checksum_data) {
+    static uint32_t checksum_buffer[256 / 4];
+    int i;
+    struct md5_ctx ctx;
+
+    for (i = 0; i < num_words; i++) {
+	checksum_buffer[i] = mem_read();
+    }
+
+    md5_init_ctx(&ctx);
+    md5_process_bytes(checksum_buffer, num_words * 4, &ctx);
+    //md5_finish_ctx(&ctx, checksum_data); 
+}
 
 uint8_t crc8_update(uint8_t crc, uint8_t data) {
     uint8_t i;
@@ -155,16 +170,20 @@ void build_tx_sfd(plcp_header_t *header_info) {
 }
 
 /* Table 82 */
-void build_tx_plcp_header(plcp_header_t *header_info) {
+void build_tx_plcp_header(plcp_header_t *header_info, int checksum) {
     uint32_t header_bits = 0;
+    uint8_t packet_length;
 
     fifo_reset();
+
+    packet_length = checksum ?	header_info->PDSU_length + MD5_DIGEST_SIZE :
+				header_info->PDSU_length;
 
     header_bits |= header_info->data_rate	<< HDR_DR_SHIFT;
     header_bits |= header_info->pilot_info	<< HDR_PI_SHIFT;
     header_bits |= header_info->burst_mode	<< HDR_BM_SHIFT;
     header_bits |= header_info->scrambler_seed	<< HDR_SS_SHIFT;
-    header_bits |= header_info->PDSU_length	<< HDR_LEN_SHIFT;
+    header_bits |= packet_length		<< HDR_LEN_SHIFT;
     header_info->crc8 = crc8(header_bits);
     header_bits |= header_info->crc8		<< HDR_CRC_SHIFT;
 
@@ -185,11 +204,19 @@ void build_tx_plcp_header(plcp_header_t *header_info) {
     }
 }
 
-uint8_t build_tx_payload(plcp_header_t *header_info) {
-    uint32_t data;
+uint8_t build_tx_payload(plcp_header_t *header_info, int checksum) {
+    int i = 0;
+    uint32_t data, packet_addr;
     uint8_t num_words = header_info->PDSU_length / 4;
     uint8_t rv = num_words;
+    uint32_t checksum_data[MD5_DIGEST_SIZE / 4];
     if (header_info->PDSU_length % 4) num_words++;
+
+    if (checksum) {
+	packet_addr = mem_get_rd_p();
+	calc_checksum(num_words, checksum_data);
+	mem_set_rd_p(packet_addr);
+    }
 
     fifo_set_rate(header_info->data_rate);
     scrambler_reseed(header_info->scrambler_seed);
@@ -198,6 +225,16 @@ uint8_t build_tx_payload(plcp_header_t *header_info) {
 	data ^= scrambler_read();
 	fifo_modulate(data);
 	num_words--;
+    }
+
+    if (checksum) {
+	num_words = MD5_DIGEST_SIZE / 4;
+	while (num_words) {
+	    data = checksum_data[i++];
+	    data ^= scrambler_read();
+	    fifo_modulate(data);
+	    num_words--;
+	}
     }
 
     fifo_flush();

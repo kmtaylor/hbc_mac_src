@@ -59,6 +59,7 @@ OBJS += \
 	src/interrupt.o \
 	src/scrambler.o \
 	src/extract_rx.o \
+	src/md5.o \
 	src/main.o
 
 # Add inputs and outputs from these tool invocations to the build variables 
